@@ -114,6 +114,70 @@ public class TokenTransferService {
 		return new PostResult("success", "assets transferred successfully", "");
 	}
 	
+	@Transactional
+	public PostResult transferFromInitiativeToInitiative(UUID fromInitiativeId, TransferDto transferDto) {
+		return transferFromInitiativeToInitiative(
+				fromInitiativeId, 
+				UUID.fromString(transferDto.getReceiverId()), 
+				UUID.fromString(transferDto.getAssetId()), 
+				transferDto.getValue(), 
+				transferDto.getMotive(), 
+				transferDto.getNotes());
+	}
+	
+	@Transactional
+	public PostResult transferFromInitiativeToInitiative(UUID fromInitiativeId, UUID toInitiativeId, UUID assetId, double value, String motive, String notes) {
+		
+		TokenType tokenType = tokenService.getTokenType(assetId);
+		Initiative from = initiativeRepository.findById(fromInitiativeId);
+		Initiative to = initiativeRepository.findById(toInitiativeId);
+		
+		tokenService.transfer(
+				tokenType.getId(), 
+				from.getId(), 
+				to.getId(), 
+				value, 
+				TokenHolderType.INITIATIVE);
+		
+		/* register the transfer to the initiative  */
+		InitiativeTransfer transfer = new InitiativeTransfer();
+		transfer.setTokenType(tokenType);
+		transfer.setFrom(from);
+		transfer.setTo(to);
+		transfer.setMotive(motive);
+		transfer.setNotes(notes);
+		transfer.setValue(value);
+		
+		transfer = initiativeTransferRepository.save(transfer);
+		
+		return new PostResult("success", "transfer saved", transfer.getId().toString());
+		
+	}
+	
+	
+	/** Get the tokens transfers from one initiative to any other initiatives */
+	@Transactional
+	public InitiativeTransfersDto getTransfersToSubInitiatives(UUID initiativeId) {
+		
+		Initiative initiative = initiativeRepository.findById(initiativeId);
+		
+		InitiativeTransfersDto initiativeTransfers = new InitiativeTransfersDto();
+		
+		initiativeTransfers.setInitiativeId(initiative.getId().toString());
+		initiativeTransfers.setInitiativeName(initiative.getName());
+		
+		for (InitiativeTransfer transfer : initiativeTransferRepository.findByFrom_Id(initiativeId)) {
+			initiativeTransfers.getTransfers().add(transfer.toDto());
+		}
+		
+		for (Initiative subInitiative : initiativeRepository.findInitiativesWithRelationship(initiative.getId(), InitiativeRelationshipType.IS_DETACHED_SUB)) {
+			/** Recursive */
+			initiativeTransfers.getSubinitiativesTransfers().add(getTransfersToSubInitiatives(subInitiative.getId()));
+		}
+		
+		return initiativeTransfers;
+	}
+	
 	/** Get the tokens transferred from one initiative into its sub-initiatives */
 	@Transactional
 	public List<TransferDto> getTransferredToSubinitiatives(UUID tokenId, UUID initiativeId) {
@@ -128,7 +192,7 @@ public class TokenTransferService {
 		
 		for (InitiativeRelationship relationship : subinitiativesRelationships) {
 			/* get all transfers of a given token made from and to these initiatives */
-			Double totalTransferred = initiativeTransferRepository.getTotalTransferred(tokenId, relationship.getId());
+			Double totalTransferred = initiativeTransferRepository.getTotalTransferredFromTo(tokenId, relationship.getOfInitiative().getId(), relationship.getInitiative().getId());
 			
 			TransferDto dto = new TransferDto();
 			

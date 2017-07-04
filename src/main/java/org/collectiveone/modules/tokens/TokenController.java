@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -81,6 +82,23 @@ public class TokenController {
 		} else {
 			return new PostResult("error", "error while minting tokens", "");
 		}
+	}
+	
+	@RequestMapping(path = "/secured/initiative/{initiativeId}/transfersToInitiatives", method = RequestMethod.GET)
+	public GetResult<InitiativeTransfersDto> getTransferToInitiatives(
+			@PathVariable("initiativeId") String initiativeId) {
+		 
+		InitiativeTransfersDto transfers = tokenTransferService.getTransfersToSubInitiatives(UUID.fromString(initiativeId));
+		
+		return new GetResult<InitiativeTransfersDto>("success", "transfers retrieved", transfers);
+	}
+	
+	@RequestMapping(path = "/secured/initiative/{initiativeId}/transferToInitiative", method = RequestMethod.POST)
+	public PostResult makeTransferToInitiative(
+			@PathVariable("initiativeId") String initiativeId,
+			@RequestBody TransferDto transferDto) {
+		 
+		return tokenTransferService.transferFromInitiativeToInitiative(UUID.fromString(initiativeId), transferDto);
 	}
 	
 	private AppUser getLoggedUser() {

@@ -75,7 +75,7 @@ public class InitiativeService {
 					return new PostResult("error", "error transferring assets",  "");
 				}
 			} else {
-				return new PostResult("error", "error adding member",  "");
+				return new PostResult("error", "error adding members",  "");
 			}
 		} else {
 			return new PostResult("error", "error creating",  "");
@@ -159,6 +159,8 @@ public class InitiativeService {
 			initiative = initiativeRepository.save(initiative);
 			tokenService.mintToHolder(token.getId(), initiative.getId(), initiativeDto.getOwnTokens().getOwnedByThisHolder(), TokenHolderType.INITIATIVE);
 			
+			activityService.newInitiativeCreated(initiative, initiative.getCreator(), token);
+			
 			return new PostResult("success", "initiative created and tokens created", initiative.getId().toString());
 			
 		} else {
@@ -172,6 +174,7 @@ public class InitiativeService {
 			
 			relationship = initiativeRelationshipRepository.save(relationship);
 			
+			List<InitiativeTransfer> transfers = new ArrayList<InitiativeTransfer>();
 			/* and transfer parent assets to child */
 			for (TransferDto thisTransfer : initiativeDto.getOtherAssetsTransfers()) {
 				TokenType token = tokenService.getTokenType(UUID.fromString(thisTransfer.getAssetId()));
@@ -180,18 +183,21 @@ public class InitiativeService {
 				
 				/* upper layer keeping track of who transfered what to whom */
 				InitiativeTransfer transfer = new InitiativeTransfer();
-				transfer.setRelationship(relationship);
+				transfer.setFrom(parent);
+				transfer.setTo(initiative);
 				transfer.setTokenType(token);
 				transfer.setValue(thisTransfer.getValue());
-				
+				transfer.setMotive("sub-initiative creation");
+				transfer.setNotes("");
+								
 				transfer = initiativeTransferRepository.save(transfer);
-				relationship.getTokensTransfers().add(transfer);
+				transfers.add(transfer);
 			}
 			
 			initiative.getRelationships().add(relationship);
 			initiativeRepository.save(initiative);
 			
-			activityService.addNewSubinitiative(parent.getId(), initiative.getId());
+			activityService.newSubinitiativeCreated(parent, initiative.getCreator(), initiative, transfers);
 		}
 			
 		return new PostResult("success", "sub initiative created and tokens transferred",  initiative.getId().toString());
@@ -199,13 +205,18 @@ public class InitiativeService {
 	
 	
 	@Transactional
-	public PostResult edit(UUID initiativeId, NewInitiativeDto initiativeDto) {
+	public PostResult edit(UUID initiativeId, UUID userId, NewInitiativeDto initiativeDto) {
 		Initiative initiative = initiativeRepository.findById(initiativeId);
+		
+		String oldName = initiative.getName();
+		String oldDriver = initiative.getDriver();
 		
 		initiative.setName(initiativeDto.getName());
 		initiative.setDriver(initiativeDto.getDriver());
 		
 		initiativeRepository.save(initiative);
+		
+		activityService.initiativeEdited(initiative, appUserRepository.findByC1Id(userId), oldName, oldDriver);
 		
 		return new PostResult("success", "initaitive updated", initiative.getId().toString());  
 	}
@@ -391,9 +402,9 @@ public class InitiativeService {
 			/* governance related data */
 			DecisionMaker decisionMaker = governanceService.getDecisionMaker(initiative.getGovernance().getId(), member.getUser().getC1Id());
 			if(decisionMaker != null) {
-				if(decisionMaker.getRole() == DecisionMakerRole.ADMIN) {
-					memberDto.setRole(DecisionMakerRole.ADMIN.toString());
-				}
+				memberDto.setRole(decisionMaker.getRole().toString());
+			} else {
+				memberDto.setRole(DecisionMakerRole.MEMBER.toString());
 			}
 			
 			initiativeMembers.getMembers().add(memberDto);
