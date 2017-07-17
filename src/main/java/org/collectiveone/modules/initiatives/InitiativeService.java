@@ -55,6 +55,9 @@ public class InitiativeService {
 	@Autowired
 	private MemberRepositoryIf memberRepository;
 	
+	@Autowired
+	private InitiativeMetaRepositoryIf initiativeMetaRepository;
+	
 	
 	
 	/** Non-transactional method to create an initiative in multiple transactions */
@@ -95,11 +98,18 @@ public class InitiativeService {
 		Initiative initiative = new Initiative();
 		
 		/* Basic properties*/
-		initiative.setName(initiativeDto.getName());
-		initiative.setDriver(initiativeDto.getDriver());
 		initiative.setCreator(creator);
-		initiative.setCreationDate(new Timestamp(System.currentTimeMillis()));
 		initiative.setEnabled(true);
+		
+		InitiativeMeta meta = new InitiativeMeta();
+		
+		meta.setName(initiativeDto.getName());
+		meta.setDriver(initiativeDto.getDriver());
+		meta.setCreationDate(new Timestamp(System.currentTimeMillis()));
+		meta.setColor("#009ee3");
+		
+		meta = initiativeMetaRepository.save(meta);
+		initiative.setMeta(meta);
 		
 		initiative = initiativeRepository.save(initiative);
 		
@@ -147,6 +157,19 @@ public class InitiativeService {
 		
 		return member;
 	}
+	
+	@Transactional 
+	public PostResult editMember(UUID initiativeId, UUID userId, DecisionMakerRole role) {
+		Initiative initiative = initiativeRepository.findById(initiativeId);
+		Member member = memberRepository.findByInitiative_IdAndUser_C1Id(initiativeId, userId);
+		
+		if (member != null) {
+			governanceService.editOrCreateDecisionMaker(initiative.getGovernance().getId(), member.getUser().getC1Id(), role);
+		}
+		
+		return new PostResult("success", "member edited", member.getId().toString());
+		
+	}
 		
 	@Transactional
 	private PostResult transferAssets(UUID initiativeId, NewInitiativeDto initiativeDto) {
@@ -176,7 +199,7 @@ public class InitiativeService {
 			
 			List<InitiativeTransfer> transfers = new ArrayList<InitiativeTransfer>();
 			/* and transfer parent assets to child */
-			for (TransferDto thisTransfer : initiativeDto.getOtherAssetsTransfers()) {
+			for (TransferDto thisTransfer : initiativeDto.getAssetsTransfers()) {
 				TokenType token = tokenService.getTokenType(UUID.fromString(thisTransfer.getAssetId()));
 				
 				tokenService.transfer(token.getId(), parent.getId(), initiative.getId(), thisTransfer.getValue(), TokenHolderType.INITIATIVE);
@@ -189,6 +212,7 @@ public class InitiativeService {
 				transfer.setValue(thisTransfer.getValue());
 				transfer.setMotive("sub-initiative creation");
 				transfer.setNotes("");
+				transfer.setOrderDate(new Timestamp(System.currentTimeMillis()));
 								
 				transfer = initiativeTransferRepository.save(transfer);
 				transfers.add(transfer);
@@ -207,14 +231,16 @@ public class InitiativeService {
 	@Transactional
 	public PostResult edit(UUID initiativeId, UUID userId, NewInitiativeDto initiativeDto) {
 		Initiative initiative = initiativeRepository.findById(initiativeId);
+		InitiativeMeta initiativeMeta = initiative.getMeta();
 		
-		String oldName = initiative.getName();
-		String oldDriver = initiative.getDriver();
+		String oldName = initiativeMeta.getName();
+		String oldDriver = initiativeMeta.getDriver();
 		
-		initiative.setName(initiativeDto.getName());
-		initiative.setDriver(initiativeDto.getDriver());
+		initiativeMeta.setName(initiativeDto.getName());
+		initiativeMeta.setDriver(initiativeDto.getDriver());
+		initiativeMeta.setColor(initiativeDto.getColor());
 		
-		initiativeRepository.save(initiative);
+		initiativeMetaRepository.save(initiativeMeta);
 		
 		activityService.initiativeEdited(initiative, appUserRepository.findByC1Id(userId), oldName, oldDriver);
 		
@@ -229,36 +255,26 @@ public class InitiativeService {
 		return  initiativeRepository.findById(id).toDto();
 	}
 	
-	/** Get the light data by calling getLight, and then add data
-	 * about the assets held by an initiative */
+	/** */
 	@Transactional
-	public InitiativeDto getWithOwnAssets(UUID id) {
+	public List<AssetsDto> getInitiativeAssets(UUID id) {
 		
-		Initiative initiative = initiativeRepository.findById(id); 
-		InitiativeDto initiativeDto = getLight(initiative.getId());
-
-		/* set own tokens data */
-		if(initiative.getTokenType() != null) {
-			AssetsDto ownTokens = tokenService.getTokensOfHolderDto(initiative.getTokenType().getId(), initiative.getId());
-			ownTokens.setHolderName(initiative.getName());
-			initiativeDto.setOwnTokens(ownTokens);
+		Initiative initiative = initiativeRepository.findById(id);
+		List<TokenType> tokenTypes = tokenService.getTokenTypesHeldBy(initiative.getId());
+		
+		List<AssetsDto> assets = new ArrayList<AssetsDto>();
+		
+		for (TokenType token : tokenTypes) {
+			AssetsDto asset = new AssetsDto();
+			asset.setAssetId(token.getId().toString());
+			asset.setAssetName(token.getName());
+			asset.setOwnedByThisHolder(tokenService.getHolder(token.getId(), initiative.getId()).getTokens());
+			asset.setTotalExistingTokens(tokenService.getTotalExisting(token.getId()));
+			
+			assets.add(asset);
 		}
 		
-		/* set other assets data */
-		List<TokenType> otherTokens = null;
-		if(initiative.getTokenType() != null) {
-			otherTokens = tokenService.getTokenTypesHeldByOtherThan(initiative.getId(), initiative.getTokenType().getId());
-		} else {
-			otherTokens = tokenService.getTokenTypesHeldBy(initiative.getId());
-		}
-		
-		for (TokenType otherToken : otherTokens) {
-			AssetsDto otherAsset = tokenService.getTokensOfHolderDto(otherToken.getId(), initiative.getId());
-			otherAsset.setHolderName(initiative.getName());
-			initiativeDto.getOtherAssets().add(otherAsset);
-		}
-		
-		return initiativeDto;
+		return assets;
 	}
 	
 	public Initiative findByTokenType_Id(UUID tokenTypeId) {
@@ -336,6 +352,16 @@ public class InitiativeService {
 		return parents;
 	}
 	
+	@Transactional List<InitiativeDto> getParentInitiativesDtos(UUID initiativeId) {
+		List<InitiativeDto> parentsDtos = new ArrayList<InitiativeDto>();
+		
+		for (Initiative parent : getParentInitiatives(initiativeId)) {
+			parentsDtos.add(parent.toDto());
+		}
+		
+		return parentsDtos;
+	}
+	
 	@Transactional
 	public List<InitiativeDto> getSubinitiativesTree(UUID initiativeId) {
 		Initiative initiative = initiativeRepository.findById(initiativeId); 
@@ -389,7 +415,7 @@ public class InitiativeService {
 		
 		InitiativeMembersDto initiativeMembers = new InitiativeMembersDto();
 		initiativeMembers.setInitiativeId(initiative.getId().toString());
-		initiativeMembers.setInitiativeName(initiative.getName());
+		initiativeMembers.setInitiativeName(initiative.getMeta().getName());
 		
 		
 		/* add members of this initiative */
@@ -433,16 +459,32 @@ public class InitiativeService {
 	public PostResult deleteMember(UUID initiativeId, UUID memberUserId) {
 		Initiative initiative = initiativeRepository.findById(initiativeId);
 		Member member = memberRepository.findByInitiative_IdAndUser_C1Id(initiativeId, memberUserId);
-		memberRepository.delete(member);
 		
-		governanceService.deleteDecisionMaker(initiative.getGovernance().getId(), member.getUser().getC1Id());
+		List<DecisionMaker> admins = governanceService.getDecisionMakerWithRole(initiative.getGovernance().getId(), DecisionMakerRole.ADMIN);
 		
-		return new PostResult("success", "contributor deleted", "");
+		boolean otherAdmin = false;
+		for (DecisionMaker admin :admins) {
+			if (!admin.getUser().getC1Id().equals(memberUserId)) {
+				otherAdmin = true;
+			}
+		}
+		
+		if (otherAdmin) {
+			/* delete only if another admin remains */
+			memberRepository.delete(member);
+			governanceService.deleteDecisionMaker(initiative.getGovernance().getId(), member.getUser().getC1Id());
+			
+			return new PostResult("success", "contributor deleted", "");
+		}
+		
+		return new PostResult("error", "user is the only admin, it cannot be deleted", "");
+		
+		
 	}
 	
 	@Transactional
 	public GetResult<List<InitiativeDto>> searchBy(String q) {
-		List<Initiative> initiatives = initiativeRepository.searchBy(q);
+		List<Initiative> initiatives = initiativeRepository.searchBy(q.toLowerCase());
 		List<InitiativeDto> initiativesDtos = new ArrayList<InitiativeDto>();
 		
 		for(Initiative initiative : initiatives) {

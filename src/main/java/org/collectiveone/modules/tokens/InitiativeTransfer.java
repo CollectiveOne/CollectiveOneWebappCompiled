@@ -1,5 +1,6 @@
 package org.collectiveone.modules.tokens;
 
+import java.sql.Timestamp;
 import java.util.UUID;
 
 import javax.persistence.Column;
@@ -32,6 +33,9 @@ public class InitiativeTransfer {
 	@ManyToOne
 	private TokenType tokenType;
 	
+	@Column(name = "oder_date")
+	private Timestamp orderDate;
+	
 	private double value;
 	
 	@Column ( name = "motive")
@@ -47,9 +51,10 @@ public class InitiativeTransfer {
 		dto.setAssetId(tokenType.getId().toString());
 		dto.setAssetName(tokenType.getName());
 		dto.setSenderId(from.getId().toString());
-		dto.setSenderName(from.getName());
+		dto.setSenderName(from.getMeta().getName());
 		dto.setReceiverId(to.getId().toString());
-		dto.setReceiverName(to.getName());
+		dto.setReceiverName(to.getMeta().getName());
+		if (orderDate != null) dto.setOrderDate(orderDate.getTime());
 		dto.setMotive(motive);
 		dto.setNotes(notes);
 		dto.setValue(value);
@@ -98,6 +103,14 @@ public class InitiativeTransfer {
 		this.value = value;
 	}
 	
+	public Timestamp getOrderDate() {
+		return orderDate;
+	}
+
+	public void setOrderDate(Timestamp orderDate) {
+		this.orderDate = orderDate;
+	}
+
 	public String getMotive() {
 		return motive;
 	}

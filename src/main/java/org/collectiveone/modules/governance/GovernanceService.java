@@ -106,6 +106,11 @@ public class GovernanceService {
 		return decisionMakerRepository.findByGovernance_IdAndUser_C1Id(governaceId, userId);
 	}
 	
+	@Transactional
+	public List<DecisionMaker> getDecisionMakerWithRole(UUID governaceId, DecisionMakerRole role) {
+		return decisionMakerRepository.findByGovernance_IdAndRole(governaceId, role);
+	}
+	
 	
 	@Transactional
 	public List<DecisionMakerDto> getDecisonMakers(UUID initiativeId) {
@@ -117,6 +122,11 @@ public class GovernanceService {
 		}
 		
 		return decisionMakerDtos;
+	}
+	
+	@Transactional
+	public DecisionMaker getDecisionMakersWithRole(UUID governaceId, UUID userId, DecisionMakerRole role) {
+		return decisionMakerRepository.findByGovernance_IdAndUser_C1Id(governaceId, userId);
 	}
 	
 	@Transactional
@@ -151,6 +161,19 @@ public class GovernanceService {
 		DecisionMaker decisionMaker = decisionMakerRepository.findByGovernance_IdAndUser_C1Id(governanceId, userId);
 		if(decisionMaker != null) {
 			decisionMakerRepository.delete(decisionMaker);
+		}
+		
+		return true;
+	}
+	
+	@Transactional
+	public boolean editOrCreateDecisionMaker(UUID governanceId, UUID userId, DecisionMakerRole role) {
+		DecisionMaker decisionMaker = decisionMakerRepository.findByGovernance_IdAndUser_C1Id(governanceId, userId);
+		if(decisionMaker == null) {
+			decisionMaker = addDecisionMaker(governanceId, userId, role);
+		} else {
+			decisionMaker.setRole(role);
+			decisionMakerRepository.save(decisionMaker);
 		}
 		
 		return true;

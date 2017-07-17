@@ -8,6 +8,9 @@ public class AssignationDto extends AssignationDtoLight {
 	private List<ReceiverDto> receivers = new ArrayList<ReceiverDto>();
 	private List<EvaluatorDto> evaluators = new ArrayList<EvaluatorDto>();
 	private EvaluationDto thisEvaluation;
+	private int evaluationsPending;
+	
+	private AssignationConfigDto config;
 	
 	public List<ReceiverDto> getReceivers() {
 		return receivers;
@@ -27,5 +30,18 @@ public class AssignationDto extends AssignationDtoLight {
 	public void setThisEvaluation(EvaluationDto thisEvaluation) {
 		this.thisEvaluation = thisEvaluation;
 	}
+	public int getEvaluationsPending() {
+		return evaluationsPending;
+	}
+	public void setEvaluationsPending(int evaluationsPending) {
+		this.evaluationsPending = evaluationsPending;
+	}
+	public AssignationConfigDto getConfig() {
+		return config;
+	}
+	public void setConfig(AssignationConfigDto config) {
+		this.config = config;
+	}
+	
 	
 }

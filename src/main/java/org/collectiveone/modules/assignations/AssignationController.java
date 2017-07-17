@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -46,6 +47,14 @@ public class AssignationController {
 	@RequestMapping(path = "/secured/initiative/{initiativeId}/assignations", method = RequestMethod.GET)
 	public GetResult<InitiativeAssignationsDto> getAssignations(@PathVariable("initiativeId") String initiativeId) {
 		return assignationService.getAssignationsResult(UUID.fromString(initiativeId), getLoggedUser().getC1Id());
+	}
+	
+	@RequestMapping(path = "/secured/assignation/{assignationId}", method = RequestMethod.GET)
+	public GetResult<AssignationDto> getAssignationOfUser(
+			@PathVariable("assignationId") String assignationId, 
+			@RequestParam(defaultValue = "false") Boolean  addAllEvaluations) {
+		
+		return assignationService.getAssignationDto(UUID.fromString(assignationId), getLoggedUser().getC1Id(), addAllEvaluations);
 	}
 	
 	@RequestMapping(path = "/secured/assignation/{assignationId}/evaluate", method = RequestMethod.POST)

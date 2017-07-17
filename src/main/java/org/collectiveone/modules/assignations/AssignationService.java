@@ -57,6 +57,9 @@ public class AssignationService {
 	@Autowired
 	private BillRepositoryIf billRepository;
 	
+	@Autowired
+	private AssignationConfigRepositoryIf assignationConfigRepository;
+	
 		
 	public PostResult createAssignation(UUID initaitiveId, AssignationDto assignationDto) {
 		Initiative initiative = initiativeRepository.findById(initaitiveId);
@@ -68,9 +71,17 @@ public class AssignationService {
 		assignation.setNotes(assignationDto.getNotes());
 		assignation.setInitiative(initiative);
 		assignation.setState(AssignationState.OPEN);
-		assignation.setMinClosureDate(new Timestamp(System.currentTimeMillis()));
-		assignation.setMaxClosureDate(new Timestamp(System.currentTimeMillis() + 7L*DAYS_TO_MS));
-		assignation.setState(AssignationState.OPEN);
+		assignation.setCreationDate(new Timestamp(System.currentTimeMillis()));
+		
+		AssignationConfig config = new AssignationConfig();
+		config.setSelfBiasVisible(Boolean.valueOf(assignationDto.getConfig().getSelfBiasVisible()));
+		config.setEvaluationsVisible(Boolean.valueOf(assignationDto.getConfig().getEvaluationsVisible()));
+		config.setMinClosureDate(new Timestamp(System.currentTimeMillis()));
+		config.setMaxClosureDate(new Timestamp(System.currentTimeMillis() + assignationDto.getConfig().getMaxDuration()*DAYS_TO_MS));
+		
+		config = assignationConfigRepository.save(config);
+		
+		assignation.setConfig(config);
 		assignation = assignationRepository.save(assignation);
 		
 		for(ReceiverDto receiverDto : assignationDto.getReceivers()) {
@@ -197,27 +208,79 @@ public class AssignationService {
 	}
 	
 	@Transactional
-	public AssignationDto getPeerReviewedAssignation(UUID initiativeId, UUID assignationId, UUID evaluatorAppUserId) {
+	public AssignationDto getPeerReviewedAssignation(UUID initiativeId, UUID assignationId, UUID evaluatorAppUserId, Boolean addAllEvaluations) {
 		Assignation assignation = assignationRepository.findById(assignationId);
 		AssignationDto assignationDto = assignation.toDto();
 		
 		/* add the evaluations of logged user */
 		Evaluator evaluator = evaluatorRepository.findByAssignationIdAndUser_C1Id(assignation.getId(), evaluatorAppUserId);
 		
-		EvaluationDto evaluation = new EvaluationDto();
-		evaluation.setId(evaluator.getGrades().toString());
-		evaluation.setEvaluationState(evaluator.getState().toString());
+		assignationDto.setEvaluationsPending(evaluatorRepository.countByAssignationIdAndState(assignation.getId(), EvaluatorState.PENDING));
 		
-		for (EvaluationGrade grade : evaluator.getGrades()) {
-			evaluation.getEvaluationGrades().add(grade.toDto());
+		if (evaluator != null) {
+			EvaluationDto evaluation = new EvaluationDto();
+			evaluation.setId(evaluator.getId().toString());
+			evaluation.setEvaluationState(evaluator.getState().toString());
+			
+			for (EvaluationGrade grade : evaluator.getGrades()) {
+				evaluation.getEvaluationGrades().add(grade.toDto());
+			}
+			
+			assignationDto.setThisEvaluation(evaluation);
 		}
 		
-		assignationDto.setThisEvaluation(evaluation);
+		/* add individual biases */
+		if (assignation.getConfig().getSelfBiasVisible()) {
+			if (assignation.getState() == AssignationState.DONE) {
+				for (Receiver receiver : assignation.getReceivers()) {
+					EvaluationGrade selfEvaluation = 
+							evaluationGradeRepository.findByAssignation_IdAndReceiver_User_C1IdAndEvaluator_User_C1Id(
+									assignation.getId(), receiver.getUser().getC1Id(), receiver.getUser().getC1Id());
+					
+					if (selfEvaluation != null) {
+						/* fill the receivers dtos selfBias */
+						for (ReceiverDto receiverDto : assignationDto.getReceivers()) {
+							if (receiverDto.getUser().getC1Id().equals(receiver.getUser().getC1Id().toString())) {
+								receiverDto.setSelfBias(selfEvaluation.getPercent() - receiverDto.getPercent());
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		/* add all the evaluations */
+		if (addAllEvaluations) {
+			if (assignation.getConfig().getEvaluationsVisible()) {
+				if (evaluator != null) {
+					if (assignation.getState() == AssignationState.DONE) {
+						for (Evaluator thisEvaluator : assignation.getEvaluators()) {
+							assignationDto.getEvaluators().add(thisEvaluator.toDto());
+						}	
+					}
+				}
+			}
+		}
+		
 		return assignationDto;
 	}
 	
 	public GetResult<InitiativeAssignationsDto> getAssignationsResult(UUID initiativeId, UUID evaluatorAppUserId) {
 		return new GetResult<InitiativeAssignationsDto>("success", "success", getAssignations(initiativeId, evaluatorAppUserId));
+	}
+	
+	public GetResult<AssignationDto> getAssignationDto(UUID assignationId, UUID userId, Boolean addAllEvaluations) {
+		
+		Assignation assignation = assignationRepository.findById(assignationId);
+		AssignationDto assignationDto = null;
+		
+		if(assignation.getType() == AssignationType.PEER_REVIEWED) {
+			assignationDto = getPeerReviewedAssignation(assignation.getInitiative().getId(), assignation.getId(), userId, addAllEvaluations);
+		} else {
+			assignationDto = assignation.toDto();
+		}
+		
+		return new GetResult<AssignationDto>("success", "assignation retreived", assignationDto);
 	}
 	
 	@Transactional
@@ -227,14 +290,10 @@ public class AssignationService {
 		
 		InitiativeAssignationsDto initiativeAssignations = new InitiativeAssignationsDto();
 		initiativeAssignations.setInitiativeId(initiative.getId().toString());
-		initiativeAssignations.setInitiativeName(initiative.getName());
+		initiativeAssignations.setInitiativeName(initiative.getMeta().getName());
 		
 		for(Assignation assignation : assignations) {
-			if(assignation.getType() == AssignationType.PEER_REVIEWED) {
-				initiativeAssignations.getAssignations().add(getPeerReviewedAssignation(initiativeId, assignation.getId(), evaluatorAppUserId));
-			} else {
-				initiativeAssignations.getAssignations().add(assignation.toDto());
-			}
+			initiativeAssignations.getAssignations().add(getAssignationDto(assignation.getId(), evaluatorAppUserId, false).getData());
 		}
 		
 		/* add the members of all sub-initiatives too */

@@ -15,6 +15,7 @@ import javax.persistence.Id;
 import javax.persistence.Lob;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
+import javax.persistence.OneToOne;
 import javax.persistence.Table;
 
 import org.collectiveone.modules.initiatives.Initiative;
@@ -36,7 +37,7 @@ public class Assignation {
 	@ManyToOne
 	private Initiative initiative;
 	
-	@Column(name = "motive")
+	@Column(name = "motive", length = 55)
 	private String motive;
 	
 	@Lob
@@ -52,11 +53,8 @@ public class Assignation {
 	@Column(name = "state")
 	private AssignationState state;
 	
-	@Column(name = "max_closure_date")
-	private Timestamp maxClosureDate;
-	
-	@Column(name = "min_closure_date")
-	private Timestamp minClosureDate;
+	@Column(name = "creation_date")
+	private Timestamp creationDate;
 	
 	@OneToMany(mappedBy="assignation", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Bill> bills = new ArrayList<Bill>();
@@ -66,6 +64,9 @@ public class Assignation {
 	
 	@OneToMany(mappedBy="assignation", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Evaluator> evaluators = new ArrayList<Evaluator>();
+	
+	@OneToOne
+	private AssignationConfig config;
 
 	
 	public AssignationDtoLight toDtoLight() {
@@ -77,7 +78,8 @@ public class Assignation {
 		dto.setNotes(notes);
 		dto.setState(state.toString());
 		dto.setInitiativeId(initiative.getId().toString());
-		dto.setInitiativeName(initiative.getName());
+		dto.setInitiativeName(initiative.getMeta().getName());
+		dto.setCreationDate(creationDate.getTime());
 		
 		for(Bill bill : bills) {
 			dto.getAssets().add(bill.toDto());
@@ -95,7 +97,9 @@ public class Assignation {
 		dto.setNotes(notes);
 		dto.setState(state.toString());
 		dto.setInitiativeId(initiative.getId().toString());
-		dto.setInitiativeName(initiative.getName());
+		dto.setInitiativeName(initiative.getMeta().getName());
+		dto.setCreationDate(creationDate.getTime());
+		dto.setConfig(config.toDto());
 		
 		for(Bill bill : bills) {
 			dto.getAssets().add(bill.toDto());
@@ -103,12 +107,6 @@ public class Assignation {
 		
 		for(Receiver receiver : receivers) {
 			dto.getReceivers().add(receiver.toDto());
-		}
-		
-		if(type == AssignationType.PEER_REVIEWED) {
-			for(Evaluator evaluator : evaluators) {
-				dto.getEvaluators().add(evaluator.toDto());
-			}
 		}
 		
 		return dto;
@@ -158,26 +156,18 @@ public class Assignation {
 		return state;
 	}
 
+	public Timestamp getCreationDate() {
+		return creationDate;
+	}
+
+	public void setCreationDate(Timestamp creationDate) {
+		this.creationDate = creationDate;
+	}
+
 	public void setState(AssignationState state) {
 		this.state = state;
 	}
 	
-	public Timestamp getMaxClosureDate() {
-		return maxClosureDate;
-	}
-
-	public void setMaxClosureDate(Timestamp maxClosureDate) {
-		this.maxClosureDate = maxClosureDate;
-	}
-
-	public Timestamp getMinClosureDate() {
-		return minClosureDate;
-	}
-
-	public void setMinClosureDate(Timestamp minClosureDate) {
-		this.minClosureDate = minClosureDate;
-	}
-
 	public List<Bill> getBills() {
 		return bills;
 	}
@@ -201,6 +191,15 @@ public class Assignation {
 	public void setEvaluators(List<Evaluator> evaluators) {
 		this.evaluators = evaluators;
 	}
+
+	public AssignationConfig getConfig() {
+		return config;
+	}
+
+	public void setConfig(AssignationConfig config) {
+		this.config = config;
+	}
+	
 	
 	
 }

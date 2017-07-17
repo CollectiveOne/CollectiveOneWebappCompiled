@@ -1,5 +1,6 @@
 package org.collectiveone.modules.tokens;
 
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -56,7 +57,7 @@ public class TokenTransferService {
 
 		Initiative initiative = initiativeRepository.findById(initiativeId); 
 		AssetsDto assetDto = tokenService.getTokensOfHolderDto(tokenId, initiative.getId());
-		assetDto.setHolderName(initiative.getName());
+		assetDto.setHolderName(initiative.getMeta().getName());
 		
 		assetDto.setTransferredToSubinitiatives(getTransferredToSubinitiatives(tokenId, initiative.getId()));
 		assetDto.setTransferredToUsers(getTransferredToUsers(tokenId, initiative.getId()));
@@ -147,6 +148,7 @@ public class TokenTransferService {
 		transfer.setMotive(motive);
 		transfer.setNotes(notes);
 		transfer.setValue(value);
+		transfer.setOrderDate(new Timestamp(System.currentTimeMillis()));
 		
 		transfer = initiativeTransferRepository.save(transfer);
 		
@@ -164,7 +166,7 @@ public class TokenTransferService {
 		InitiativeTransfersDto initiativeTransfers = new InitiativeTransfersDto();
 		
 		initiativeTransfers.setInitiativeId(initiative.getId().toString());
-		initiativeTransfers.setInitiativeName(initiative.getName());
+		initiativeTransfers.setInitiativeName(initiative.getMeta().getName());
 		
 		for (InitiativeTransfer transfer : initiativeTransferRepository.findByFrom_Id(initiativeId)) {
 			initiativeTransfers.getTransfers().add(transfer.toDto());
@@ -199,9 +201,9 @@ public class TokenTransferService {
 			dto.setAssetId(token.getId().toString());
 			dto.setAssetName(token.getName());
 			dto.setSenderId(relationship.getOfInitiative().getId().toString());
-			dto.setSenderName(relationship.getOfInitiative().getName());
+			dto.setSenderName(relationship.getOfInitiative().getMeta().getName());
 			dto.setReceiverId(relationship.getInitiative().getId().toString());
-			dto.setReceiverName(relationship.getInitiative().getName());
+			dto.setReceiverName(relationship.getInitiative().getMeta().getName());
 			dto.setValue(totalTransferred);
 			
 			transferredToSubinitiatives.add(dto);
@@ -226,7 +228,7 @@ public class TokenTransferService {
 			dto.setAssetId(token.getId().toString());
 			dto.setAssetName(token.getName());
 			dto.setSenderId(initiative.getId().toString());
-			dto.setSenderName(initiative.getName());
+			dto.setSenderName(initiative.getMeta().getName());
 			dto.setReceiverId(member.getUser().getC1Id().toString());
 			dto.setReceiverName(member.getUser().getNickname());
 			dto.setValue(totalTransferred);
