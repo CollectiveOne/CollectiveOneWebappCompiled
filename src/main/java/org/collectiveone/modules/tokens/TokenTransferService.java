@@ -8,6 +8,7 @@ import java.util.UUID;
 import javax.transaction.Transactional;
 
 import org.collectiveone.common.dto.PostResult;
+import org.collectiveone.modules.activity.ActivityService;
 import org.collectiveone.modules.initiatives.Initiative;
 import org.collectiveone.modules.initiatives.InitiativeRelationship;
 import org.collectiveone.modules.initiatives.InitiativeRelationshipRepositoryIf;
@@ -23,6 +24,9 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class TokenTransferService {
+
+	@Autowired
+	private ActivityService activityService;
 	
 	@Autowired
 	private TokenService tokenService;
@@ -47,6 +51,9 @@ public class TokenTransferService {
 	
 	@Autowired
 	private InitiativeRelationshipRepositoryIf initiativeRelationshipRepository;
+	
+	@Autowired
+	private TokenMintRepositoryIf tokenMintRespository;
 	
 	
 	
@@ -83,6 +90,31 @@ public class TokenTransferService {
 	}
 	
 	@Transactional
+	public String mintToInitiative(UUID tokenId, UUID initiativeId, UUID orderByUserId, TokenMintDto mintDto) {
+		
+		String result = tokenService.mintToHolder(tokenId, initiativeId, mintDto.getValue(), TokenHolderType.INITIATIVE);
+		
+		if (result.equals("success")) {
+			AppUser orderedBy = appUserRepository.findByC1Id(orderByUserId);
+			
+			TokenMint mint = new TokenMint();
+			mint.setToken(tokenService.getTokenType(tokenId));
+			mint.setOrderedBy(orderedBy);
+			mint.setToHolder(initiativeId);
+			mint.setMotive(mintDto.getMotive());
+			mint.setNotes(mintDto.getNotes());
+			mint.setValue(mintDto.getValue());
+			
+			mint = tokenMintRespository.save(mint);
+			
+			activityService.tokensMinted(initiativeRepository.findById(initiativeId), mint);
+		}
+		
+		return result;
+		
+	}
+	
+	@Transactional
 	public PostResult transferFromInitiativeToUser(UUID initiativeId, TransferDto transfer) {
 		return transferFromInitiativeToUser(initiativeId, UUID.fromString(transfer.getReceiverId()), UUID.fromString(transfer.getAssetId()), transfer.getValue());
 	}
@@ -116,10 +148,11 @@ public class TokenTransferService {
 	}
 	
 	@Transactional
-	public PostResult transferFromInitiativeToInitiative(UUID fromInitiativeId, TransferDto transferDto) {
+	public PostResult transferFromInitiativeToInitiative(UUID fromInitiativeId, TransferDto transferDto, UUID orderByUserId) {
 		return transferFromInitiativeToInitiative(
 				fromInitiativeId, 
-				UUID.fromString(transferDto.getReceiverId()), 
+				UUID.fromString(transferDto.getReceiverId()),
+				orderByUserId,
 				UUID.fromString(transferDto.getAssetId()), 
 				transferDto.getValue(), 
 				transferDto.getMotive(), 
@@ -127,7 +160,7 @@ public class TokenTransferService {
 	}
 	
 	@Transactional
-	public PostResult transferFromInitiativeToInitiative(UUID fromInitiativeId, UUID toInitiativeId, UUID assetId, double value, String motive, String notes) {
+	public PostResult transferFromInitiativeToInitiative(UUID fromInitiativeId, UUID toInitiativeId, UUID orderByUserId, UUID assetId, double value, String motive, String notes) {
 		
 		TokenType tokenType = tokenService.getTokenType(assetId);
 		Initiative from = initiativeRepository.findById(fromInitiativeId);
@@ -149,8 +182,11 @@ public class TokenTransferService {
 		transfer.setNotes(notes);
 		transfer.setValue(value);
 		transfer.setOrderDate(new Timestamp(System.currentTimeMillis()));
+		transfer.setOrderedBy(appUserRepository.findByC1Id(orderByUserId));
 		
 		transfer = initiativeTransferRepository.save(transfer);
+		
+		activityService.transferToSubinitiative(transfer);
 		
 		return new PostResult("success", "transfer saved", transfer.getId().toString());
 		

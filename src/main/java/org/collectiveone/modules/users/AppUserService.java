@@ -56,7 +56,7 @@ public class AppUserService {
 
 	@Transactional
 	public GetResult<List<AppUserDto>> searchBy(String q) {
-		List<AppUser> appUsers = appUserRepository.searchByNickname(q);
+		List<AppUser> appUsers = appUserRepository.findTop10ByNicknameLikeIgnoreCase("%"+q+"%");
 		
 		List<AppUserDto> appUserDtos = new ArrayList<AppUserDto>();
 		
@@ -79,7 +79,7 @@ public class AppUserService {
 			appUser = new AppUser();
 			
 			appUser.setAuth0Id(auth0User.getId());
-			appUser.setNickname(auth0User.getNickname());
+			appUser.setNickname(auth0User.getName());
 			appUser.setEmail(auth0User.getEmail());
 			appUser.setPictureUrl(auth0User.getPicture());
 			appUser.setEmailNotificationsEnabled(true);

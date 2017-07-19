@@ -1,6 +1,9 @@
 package org.collectiveone.modules.activity;
 
+import org.collectiveone.modules.assignations.AssignationDto;
 import org.collectiveone.modules.initiatives.InitiativeDto;
+import org.collectiveone.modules.tokens.TokenMintDto;
+import org.collectiveone.modules.tokens.TransferDto;
 import org.collectiveone.modules.users.AppUserDto;
 
 public class ActivityDto {
@@ -11,6 +14,9 @@ public class ActivityDto {
 	private InitiativeDto subInitiative;
 	private String oldName;
 	private String oldDriver;
+	private TokenMintDto mint;
+	private AssignationDto assignation;
+	private TransferDto transfer;
 	
 	public String getType() {
 		return type;
@@ -48,6 +54,23 @@ public class ActivityDto {
 	public void setOldDriver(String oldDriver) {
 		this.oldDriver = oldDriver;
 	}
-	
+	public TokenMintDto getMint() {
+		return mint;
+	}
+	public void setMint(TokenMintDto mint) {
+		this.mint = mint;
+	}
+	public AssignationDto getAssignation() {
+		return assignation;
+	}
+	public void setAssignation(AssignationDto assignation) {
+		this.assignation = assignation;
+	}
+	public TransferDto getTransfer() {
+		return transfer;
+	}
+	public void setTransfer(TransferDto transfer) {
+		this.transfer = transfer;
+	}
 	
 }

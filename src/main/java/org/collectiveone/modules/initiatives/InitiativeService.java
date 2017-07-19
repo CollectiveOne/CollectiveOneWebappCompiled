@@ -242,7 +242,11 @@ public class InitiativeService {
 		
 		initiativeMetaRepository.save(initiativeMeta);
 		
-		activityService.initiativeEdited(initiative, appUserRepository.findByC1Id(userId), oldName, oldDriver);
+		if (!oldName.equals(initiativeDto.getName()) || !oldDriver.equals(initiativeDto.getDriver())) {
+			/* notify only if actually different */
+			activityService.initiativeEdited(initiative, appUserRepository.findByC1Id(userId), oldName, oldDriver);
+		}
+		
 		
 		return new PostResult("success", "initaitive updated", initiative.getId().toString());  
 	}
@@ -396,9 +400,9 @@ public class InitiativeService {
 			/* governance related data */
 			DecisionMaker decisionMaker = governanceService.getDecisionMaker(initiative.getGovernance().getId(), member.getUser().getC1Id());
 			if(decisionMaker != null) {
-				if(decisionMaker.getRole() == DecisionMakerRole.ADMIN) {
-					memberDto.setRole(DecisionMakerRole.ADMIN.toString());
-				}
+				memberDto.setRole(decisionMaker.getRole().toString());
+			} else {
+				memberDto.setRole(DecisionMakerRole.MEMBER.toString());
 			}
 		} else {
 			memberDto.setId("");

@@ -11,10 +11,12 @@ import javax.transaction.Transactional;
 
 import org.collectiveone.common.dto.GetResult;
 import org.collectiveone.common.dto.PostResult;
+import org.collectiveone.modules.assignations.Assignation;
 import org.collectiveone.modules.initiatives.Initiative;
 import org.collectiveone.modules.initiatives.InitiativeService;
 import org.collectiveone.modules.initiatives.Member;
 import org.collectiveone.modules.tokens.InitiativeTransfer;
+import org.collectiveone.modules.tokens.TokenMint;
 import org.collectiveone.modules.tokens.TokenType;
 import org.collectiveone.modules.users.AppUser;
 import org.collectiveone.modules.users.AppUserRepositoryIf;
@@ -67,7 +69,7 @@ public class ActivityService {
 		
 		List<NotificationDto> notifications = new ArrayList<NotificationDto>();
 		
-		for(Notification notification : notificationRepository.findBySubscriber_User_C1Id(userId)) {
+		for(Notification notification : notificationRepository.findTop10BySubscriber_User_C1IdOrderByCreationDateDesc(userId)) {
 			notifications.add(notification.toDto());
 		}
 		
@@ -121,7 +123,12 @@ public class ActivityService {
 	@Transactional
 	public GetResult<SubscriberDto> getSubscriber(UUID userId, UUID initiativeId) {
 		Subscriber subscriber = subscriberRepository.findByElementIdAndUser_C1Id(initiativeId, userId);
-		return new GetResult<SubscriberDto>("success", "success", subscriber.toDto());
+		if (subscriber != null) {
+			return new GetResult<SubscriberDto>("success", "success", subscriber.toDto());	
+		} else {
+			return new GetResult<SubscriberDto>("success", "subscriber not found", null);
+		}
+		
 	}
 	
 	/** Each user have one general purposed Susbscriber element used to send general notifications
@@ -144,7 +151,12 @@ public class ActivityService {
 		return subscriberRepository.save(subscriber);
 	}
 	
-	/* REGISTER NEW ACTIVITY */
+	/**
+	 * 
+	 * First Step
+	 * 
+	 * */
+	
 	
 	@Transactional
 	public void newInitiativeCreated(Initiative initiative, AppUser triggerUser, TokenType token) {
@@ -196,6 +208,95 @@ public class ActivityService {
 		addInitiativeActivityNotifications(activity);
 	}
 	
+	@Transactional
+	public void tokensMinted(Initiative initiative, TokenMint mint) {
+		Activity activity = new Activity();
+		
+		activity.setType(ActivityType.TOKENS_MINTED);
+		activity.setTriggerUser(mint.getOrderedBy());
+		activity.setInitiative(initiative);
+		activity.setTimestamp(new Timestamp(System.currentTimeMillis()));
+		
+		activity.setMint(mint);
+		
+		activity = activityRepository.save(activity);
+		
+		addInitiativeActivityNotifications(activity);
+	}
+	
+	@Transactional
+	public void peerReviewedAssignationCreated(Assignation assignation, AppUser triggerUser) {
+		Activity activity = new Activity();
+		
+		activity.setType(ActivityType.PR_ASSIGNATION_CREATED);
+		activity.setTriggerUser(triggerUser);
+		activity.setInitiative(assignation.getInitiative());
+		activity.setTimestamp(new Timestamp(System.currentTimeMillis()));
+		
+		activity.setAssignation(assignation);
+		
+		activity = activityRepository.save(activity);
+		
+		addInitiativeActivityNotifications(activity);
+	}
+	
+	@Transactional
+	public void peerReviewedAssignationDone(Assignation assignation) {
+		Activity activity = new Activity();
+		
+		activity.setType(ActivityType.PR_ASSIGNATION_DONE);
+		activity.setTriggerUser(assignation.getCreator());
+		activity.setInitiative(assignation.getInitiative());
+		activity.setTimestamp(new Timestamp(System.currentTimeMillis()));
+		
+		activity.setAssignation(assignation);
+		
+		activity = activityRepository.save(activity);
+		
+		addInitiativeActivityNotifications(activity);
+	}
+	
+	@Transactional
+	public void directAssignationCreated(Assignation assignation, AppUser triggerUser) {
+		Activity activity = new Activity();
+		
+		activity.setType(ActivityType.D_ASSIGNATION_CREATED);
+		activity.setTriggerUser(triggerUser);
+		activity.setInitiative(assignation.getInitiative());
+		activity.setTimestamp(new Timestamp(System.currentTimeMillis()));
+		
+		activity.setAssignation(assignation);
+		
+		activity = activityRepository.save(activity);
+		
+		addInitiativeActivityNotifications(activity);
+	}
+	
+	@Transactional
+	public void transferToSubinitiative(InitiativeTransfer transfer) {
+		Activity activity = new Activity();
+		
+		activity.setType(ActivityType.INITIATIVE_TRANSFER);
+		activity.setTriggerUser(transfer.getOrderedBy());
+		activity.setInitiative(transfer.getFrom());
+		activity.setTimestamp(new Timestamp(System.currentTimeMillis()));
+		
+		activity.setInitiativeTransfer(transfer);
+		
+		activity = activityRepository.save(activity);
+		
+		addInitiativeActivityNotifications(activity);
+	}
+	
+	
+	/**
+	 * 
+	 * Second Step
+	 * 
+	 * */
+	
+	
+	
 	private void addNewInitiativeNotifications (Activity activity) {
 		SortedSet<Member> members = activity.getInitiative().getMembers();
 		
@@ -205,6 +306,7 @@ public class ActivityService {
 				Subscriber subscriber = getOrCreateCollectiveOneSubscriber(member.getUser().getC1Id());
 				
 				Notification notification = new Notification();
+				notification.setCreationDate(new Timestamp(System.currentTimeMillis()));
 				notification.setActivity(activity);
 				notification.setSubscriber(subscriber);
 				notification.setState(NotificationState.PENDING);
@@ -226,15 +328,18 @@ public class ActivityService {
 		for (Subscriber subscriber : subscribers) {
 			if(activity.getTriggerUser().getC1Id() != subscriber.getUser().getC1Id()) {
 				/* add a notification only if the trigger user is not the subscriber */
-				Notification notification = new Notification();
-				notification.setActivity(activity);
-				notification.setSubscriber(subscriber);
-				notification.setState(NotificationState.PENDING);
-				notification.setEmailState(NotificationEmailState.PENDING);
-				
-				notification = notificationRepository.save(notification);
-				
-				activity.getNotifications().add(notification);
+				if (subscriber.getState() == SubscriberState.SUBSCRIBED) {
+					Notification notification = new Notification();
+					notification.setCreationDate(new Timestamp(System.currentTimeMillis()));
+					notification.setActivity(activity);
+					notification.setSubscriber(subscriber);
+					notification.setState(NotificationState.PENDING);
+					notification.setEmailState(NotificationEmailState.PENDING);
+					
+					notification = notificationRepository.save(notification);
+					
+					activity.getNotifications().add(notification);
+				}
 			}
 		}
 	}
