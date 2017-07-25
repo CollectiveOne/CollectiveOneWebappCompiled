@@ -10,6 +10,7 @@ import java.util.Locale;
 
 import org.collectiveone.modules.assignations.Assignation;
 import org.collectiveone.modules.assignations.Evaluator;
+import org.collectiveone.modules.assignations.Receiver;
 import org.collectiveone.modules.initiatives.Initiative;
 import org.collectiveone.modules.tokens.InitiativeTransfer;
 import org.collectiveone.modules.tokens.TokenMint;
@@ -115,6 +116,26 @@ public class EmailService {
 					
 				case PR_ASSIGNATION_DONE:
 					mail = preparePRAssignationDoneEmail(notifications);
+					break;
+					
+				case ASSIGNATION_REVERT_ORDERED:
+					mail = prepareAssignationRevertOrderedEmail(notifications);
+					break;
+					
+				case ASSIGNATION_REVERT_CANCELLED:
+					mail = prepareAssignationRevertCancelledEmail(notifications);
+					break;
+					
+				case ASSIGNATION_REVERTED:
+					mail = prepareAssignationRevertedEmail(notifications);
+					break;
+					
+				case ASSIGNATION_DELETED:
+					mail = prepareAssignationDeletedEmail(notifications);
+					break;
+					
+				case INITIATIVE_DELETED:
+					mail = prepareInitiativeDeletedEmail(notifications);
 					break;
 					
 				default:
@@ -440,6 +461,166 @@ public class EmailService {
 						transfer.getValue() + " " + transfer.getTokenType().getName() +
 						" to " + getInitiativeAnchor(transfer.getTo()) + ", with motive: </p><p>" + transfer.getMotive() + ".</p>"; 
 
+				personalization.addSubstitution("$MESSAGE$", message);
+				
+				mail.addPersonalization(personalization);
+			}
+		}
+		
+		mail.setTemplateId(env.getProperty("collectiveone.webapp.new-subinitiative-template"));
+		
+		return mail;
+	}
+	
+	
+	private Mail prepareAssignationRevertOrderedEmail(List<Notification> notifications)	{
+		Mail mail = new Mail();
+		
+		Email fromEmail = new Email();
+		fromEmail.setName(env.getProperty("collectiveone.webapp.from-mail-name"));
+		fromEmail.setEmail(env.getProperty("collectiveone.webapp.from-mail"));
+		mail.setFrom(fromEmail);
+		mail.setSubject("Transfer revert ordered");
+	
+		for(Notification notification : notifications) {
+			if(notification.getSubscriber().getUser().getEmailNotificationsEnabled()) {
+				Personalization personalization = basicInitiativePersonalization(notification);
+				
+				Assignation assignation = notification.getActivity().getAssignation();
+				
+				String message = "<p>wants to revert the " + getAssignationAnchor(assignation) + 
+						" of " + assignation.getBills().get(0).getValue() + " " + assignation.getBills().get(0).getTokenType().getName() + 
+						" with motive: " + assignation.getMotive() + ".</p> ";
+				
+				for (Receiver receiver : assignation.getReceivers()) {
+					if (receiver.getUser().getC1Id().equals(notification.getSubscriber().getUser().getC1Id())) {
+						message += "<p>You were one of the transfer receivers, so you will have to approve this revert by "
+								+ "visiting the " + getAssignationAnchor(assignation) + " page.</p>";
+					}
+				}
+
+				personalization.addSubstitution("$MESSAGE$", message);
+				
+				mail.addPersonalization(personalization);
+			}
+		}
+		
+		mail.setTemplateId(env.getProperty("collectiveone.webapp.new-subinitiative-template"));
+		
+		return mail;
+	}
+	
+	private Mail prepareAssignationRevertCancelledEmail(List<Notification> notifications)	{
+		Mail mail = new Mail();
+		
+		Email fromEmail = new Email();
+		fromEmail.setName(env.getProperty("collectiveone.webapp.from-mail-name"));
+		fromEmail.setEmail(env.getProperty("collectiveone.webapp.from-mail"));
+		mail.setFrom(fromEmail);
+		mail.setSubject("Transfer revert cancelled");
+	
+		for(Notification notification : notifications) {
+			if(notification.getSubscriber().getUser().getEmailNotificationsEnabled()) {
+				Personalization personalization = basicInitiativePersonalization(notification);
+				
+				Assignation assignation = notification.getActivity().getAssignation();
+				
+				String message = "<p>ordered a revert of the " + getAssignationAnchor(assignation) + 
+						" of " + assignation.getBills().get(0).getValue() + " " + assignation.getBills().get(0).getTokenType().getName() + 
+						" with motive: " + assignation.getMotive() + ", but this revert has been cancelled.</p> ";
+				
+				personalization.addSubstitution("$MESSAGE$", message);
+				
+				mail.addPersonalization(personalization);
+			}
+		}
+		
+		mail.setTemplateId(env.getProperty("collectiveone.webapp.new-subinitiative-template"));
+		
+		return mail;
+	}
+	
+	
+	
+	private Mail prepareAssignationRevertedEmail(List<Notification> notifications)	{
+		Mail mail = new Mail();
+		
+		Email fromEmail = new Email();
+		fromEmail.setName(env.getProperty("collectiveone.webapp.from-mail-name"));
+		fromEmail.setEmail(env.getProperty("collectiveone.webapp.from-mail"));
+		mail.setFrom(fromEmail);
+		mail.setSubject("Transfer revert accepted");
+	
+		for(Notification notification : notifications) {
+			if(notification.getSubscriber().getUser().getEmailNotificationsEnabled()) {
+				Personalization personalization = basicInitiativePersonalization(notification);
+				
+				Assignation assignation = notification.getActivity().getAssignation();
+				
+				String message = "<p>ordered a revert of the " + getAssignationAnchor(assignation) + 
+						" of " + assignation.getBills().get(0).getValue() + " " + assignation.getBills().get(0).getTokenType().getName() + 
+						" with motive: " + assignation.getMotive() + ", and the revert has been accepted.</p> ";
+				
+				personalization.addSubstitution("$MESSAGE$", message);
+				
+				mail.addPersonalization(personalization);
+			}
+		}
+		
+		mail.setTemplateId(env.getProperty("collectiveone.webapp.new-subinitiative-template"));
+		
+		return mail;
+	}
+	
+	private Mail prepareAssignationDeletedEmail(List<Notification> notifications)	{
+		Mail mail = new Mail();
+		
+		Email fromEmail = new Email();
+		fromEmail.setName(env.getProperty("collectiveone.webapp.from-mail-name"));
+		fromEmail.setEmail(env.getProperty("collectiveone.webapp.from-mail"));
+		mail.setFrom(fromEmail);
+		mail.setSubject("Transfer deleted");
+	
+		for(Notification notification : notifications) {
+			if(notification.getSubscriber().getUser().getEmailNotificationsEnabled()) {
+				Personalization personalization = basicInitiativePersonalization(notification);
+				
+				Assignation assignation = notification.getActivity().getAssignation();
+				
+				String message = "<p>deleted the ongoing " + getAssignationAnchor(assignation) + 
+						" of " + assignation.getBills().get(0).getValue() + " " + assignation.getBills().get(0).getTokenType().getName() + 
+						" with motive: " + assignation.getMotive() + ". No tokens have or will be transferred.</p> ";
+				
+				personalization.addSubstitution("$MESSAGE$", message);
+				
+				mail.addPersonalization(personalization);
+			}
+		}
+		
+		mail.setTemplateId(env.getProperty("collectiveone.webapp.new-subinitiative-template"));
+		
+		return mail;
+	}
+	
+	private Mail prepareInitiativeDeletedEmail(List<Notification> notifications)	{
+		Mail mail = new Mail();
+		
+		Email fromEmail = new Email();
+		fromEmail.setName(env.getProperty("collectiveone.webapp.from-mail-name"));
+		fromEmail.setEmail(env.getProperty("collectiveone.webapp.from-mail"));
+		mail.setFrom(fromEmail);
+		mail.setSubject("Transfer deleted");
+	
+		for(Notification notification : notifications) {
+			if(notification.getSubscriber().getUser().getEmailNotificationsEnabled()) {
+				Personalization personalization = basicInitiativePersonalization(notification);
+				
+				Initiative initiative = notification.getActivity().getInitiative();
+				
+				String message = "<p>deleted the initiative " + getInitiativeAnchor(initiative) + 
+						". All its assets, if any, have been transferred to its parent initiative,"
+						+ "if the parent exist.</p> ";
+				
 				personalization.addSubstitution("$MESSAGE$", message);
 				
 				mail.addPersonalization(personalization);

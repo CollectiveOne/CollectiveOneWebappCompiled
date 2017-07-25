@@ -138,13 +138,29 @@ public class TokenTransferService {
 		thisTransfer.setMember(member);
 		thisTransfer.setTokenType(tokenType);
 		thisTransfer.setValue(value);
+		thisTransfer.setStatus(MemberTransferStatus.DONE);
 		
-		memberTransferRepository.save(thisTransfer);
+		thisTransfer = memberTransferRepository.save(thisTransfer);
 		member.getTokensTransfers().add(thisTransfer);
 		
 		memberRepository.save(member);
 	
-		return new PostResult("success", "assets transferred successfully", "");
+		return new PostResult("success", "assets transferred successfully", thisTransfer.getId().toString());
+	}
+	
+	@Transactional
+	public void revertTransferFromInitiativeToUser(UUID transferId) {
+		MemberTransfer transfer = memberTransferRepository.findById(transferId);
+		
+		tokenService.transfer(
+				transfer.getTokenType().getId(), 
+				transfer.getMember().getUser().getC1Id(), 
+				transfer.getMember().getInitiative().getId(), 
+				transfer.getValue(), 
+				TokenHolderType.INITIATIVE);
+		
+		
+		transfer.setStatus(MemberTransferStatus.REVERTED);
 	}
 	
 	@Transactional
@@ -188,8 +204,22 @@ public class TokenTransferService {
 		
 		activityService.transferToSubinitiative(transfer);
 		
-		return new PostResult("success", "transfer saved", transfer.getId().toString());
+		return new PostResult("success", "transfer done", transfer.getId().toString());
 		
+	}
+	
+	
+	@Transactional
+	public PostResult transferAllFromInitiativeToInitiative(UUID fromInitiativeId, UUID toInitiativeId, UUID orderByUserId, String motive, String notes) {
+		
+		List<TokenType> tokenTypes = tokenService.getTokenTypesHeldBy(fromInitiativeId);
+		
+		for (TokenType tokenType : tokenTypes) {
+			TokenHolder holder = tokenService.getHolder(tokenType.getId(), fromInitiativeId);
+			transferFromInitiativeToInitiative(fromInitiativeId, toInitiativeId, orderByUserId, tokenType.getId(), holder.getTokens(), motive, notes);
+		}
+		
+		return new PostResult("success", "all assets sent", "");
 	}
 	
 	
@@ -231,6 +261,7 @@ public class TokenTransferService {
 		for (InitiativeRelationship relationship : subinitiativesRelationships) {
 			/* get all transfers of a given token made from and to these initiatives */
 			Double totalTransferred = initiativeTransferRepository.getTotalTransferredFromTo(tokenId, relationship.getOfInitiative().getId(), relationship.getInitiative().getId());
+			Double totalReturned = initiativeTransferRepository.getTotalTransferredFromTo(tokenId, relationship.getInitiative().getId(), relationship.getOfInitiative().getId());
 			
 			TransferDto dto = new TransferDto();
 			
@@ -240,7 +271,7 @@ public class TokenTransferService {
 			dto.setSenderName(relationship.getOfInitiative().getMeta().getName());
 			dto.setReceiverId(relationship.getInitiative().getId().toString());
 			dto.setReceiverName(relationship.getInitiative().getMeta().getName());
-			dto.setValue(totalTransferred);
+			dto.setValue(totalTransferred - totalReturned);
 			
 			transferredToSubinitiatives.add(dto);
 		}

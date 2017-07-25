@@ -288,6 +288,89 @@ public class ActivityService {
 		addInitiativeActivityNotifications(activity);
 	}
 	
+	@Transactional
+	public void assignationRevertOrdered(Assignation assignation, AppUser triggerUser) {
+		Activity activity = new Activity();
+		
+		activity.setType(ActivityType.ASSIGNATION_REVERT_ORDERED);
+		activity.setTriggerUser(triggerUser);
+		activity.setInitiative(assignation.getInitiative());
+		activity.setTimestamp(new Timestamp(System.currentTimeMillis()));
+		
+		activity.setAssignation(assignation);
+		
+		activity = activityRepository.save(activity);
+		
+		addInitiativeActivityNotifications(activity);
+	}
+	
+	@Transactional
+	public void assignationRevertCancelled(Assignation assignation) {
+		Activity revertOrder = activityRepository.findTop1ByAssignation_IdAndTypeOrderByTimestampDesc(assignation.getId(), ActivityType.ASSIGNATION_REVERT_ORDERED);
+		
+		Activity activity = new Activity();
+		
+		activity.setType(ActivityType.ASSIGNATION_REVERT_CANCELLED);
+		activity.setTriggerUser(revertOrder.getTriggerUser());
+		activity.setInitiative(assignation.getInitiative());
+		activity.setTimestamp(new Timestamp(System.currentTimeMillis()));
+		
+		activity.setAssignation(assignation);
+		
+		activity = activityRepository.save(activity);
+		
+		addInitiativeActivityNotifications(activity);
+	}
+	
+	@Transactional
+	public void assignationReverted(Assignation assignation) {
+		Activity revertOrder = activityRepository.findTop1ByAssignation_IdAndTypeOrderByTimestampDesc(assignation.getId(), ActivityType.ASSIGNATION_REVERT_ORDERED);
+		
+		Activity activity = new Activity();
+		
+		activity.setType(ActivityType.ASSIGNATION_REVERTED);
+		activity.setTriggerUser(revertOrder.getTriggerUser());
+		activity.setInitiative(assignation.getInitiative());
+		activity.setTimestamp(new Timestamp(System.currentTimeMillis()));
+		
+		activity.setAssignation(assignation);
+		
+		activity = activityRepository.save(activity);
+		
+		addInitiativeActivityNotifications(activity);
+	}
+	
+	@Transactional
+	public void assignationDeleted(Assignation assignation, AppUser triggerUser) {
+		Activity activity = new Activity();
+		
+		activity.setType(ActivityType.ASSIGNATION_DELETED);
+		activity.setTriggerUser(triggerUser);
+		activity.setInitiative(assignation.getInitiative());
+		activity.setTimestamp(new Timestamp(System.currentTimeMillis()));
+		
+		activity.setAssignation(assignation);
+		
+		activity = activityRepository.save(activity);
+		
+		addInitiativeActivityNotifications(activity);
+	}
+	
+	@Transactional
+	public void initiativeDeleted(Initiative initiative, AppUser triggerUser) {
+		Activity activity = new Activity();
+		
+		activity.setType(ActivityType.INITIATIVE_DELETED);
+		activity.setTriggerUser(triggerUser);
+		activity.setInitiative(initiative);
+		activity.setTimestamp(new Timestamp(System.currentTimeMillis()));
+		
+		activity = activityRepository.save(activity);
+		
+		addInitiativeActivityNotifications(activity);
+	}
+	
+	
 	
 	/**
 	 * 
