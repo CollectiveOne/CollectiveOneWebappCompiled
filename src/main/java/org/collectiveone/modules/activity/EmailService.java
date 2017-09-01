@@ -154,6 +154,7 @@ public class EmailService {
 						Response response = sg.api(request);
 						
 						if(response.statusCode == 202) {
+							System.out.println("emails sent!");
 							return "success";
 						} else {
 							return response.body;
@@ -365,7 +366,7 @@ public class EmailService {
 					if (assignation.getReceivers().get(ix).getUser().getC1Id() == notification.getSubscriber().getUser().getC1Id()) {
 						receiversList += "you";
 					} else {
-						receiversList += assignation.getReceivers().get(ix).getUser().getNickname();
+						receiversList += assignation.getReceivers().get(ix).getUser().getProfile().getNickname();
 					}
 					
 					
@@ -450,7 +451,7 @@ public class EmailService {
 				
 				String message = "<p>made a direct " + getAssignationAnchor(assignation) + " of " + 
 						assignation.getBills().get(0).getValue() + " " + assignation.getBills().get(0).getTokenType().getName() +
-						" to " + assignation.getReceivers().get(0).getUser().getNickname() + ", with motive: </p><p>" + assignation.getMotive() + ".</p>"; 
+						" to " + assignation.getReceivers().get(0).getUser().getProfile().getNickname() + ", with motive: </p><p>" + assignation.getMotive() + ".</p>"; 
 
 				personalization.addSubstitution("$MESSAGE$", message);
 				
@@ -679,8 +680,8 @@ public class EmailService {
 	
 	private Personalization basicInitiativePersonalization(Notification notification) {
 		String toEmailString = notification.getSubscriber().getUser().getEmail();
-		String triggeredByUsername = notification.getActivity().getTriggerUser().getNickname();
-		String triggerUserPictureUrl = notification.getActivity().getTriggerUser().getPictureUrl();
+		String triggeredByUsername = notification.getActivity().getTriggerUser().getProfile().getNickname();
+		String triggerUserPictureUrl = notification.getActivity().getTriggerUser().getProfile().getPictureUrl();
 		Initiative initiative = notification.getActivity().getInitiative();
 		
 		Personalization personalization = new Personalization();
