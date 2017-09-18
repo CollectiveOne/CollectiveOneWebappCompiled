@@ -14,12 +14,12 @@ import org.collectiveone.modules.assignations.AssignationService;
 import org.collectiveone.modules.assignations.Bill;
 import org.collectiveone.modules.initiatives.Initiative;
 import org.collectiveone.modules.initiatives.InitiativeRelationship;
-import org.collectiveone.modules.initiatives.InitiativeRelationshipRepositoryIf;
 import org.collectiveone.modules.initiatives.InitiativeRelationshipType;
-import org.collectiveone.modules.initiatives.InitiativeRepositoryIf;
 import org.collectiveone.modules.initiatives.InitiativeService;
 import org.collectiveone.modules.initiatives.Member;
-import org.collectiveone.modules.initiatives.MemberRepositoryIf;
+import org.collectiveone.modules.initiatives.repositories.InitiativeRelationshipRepositoryIf;
+import org.collectiveone.modules.initiatives.repositories.InitiativeRepositoryIf;
+import org.collectiveone.modules.initiatives.repositories.MemberRepositoryIf;
 import org.collectiveone.modules.users.AppUser;
 import org.collectiveone.modules.users.AppUserRepositoryIf;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -260,7 +260,7 @@ public class TokenTransferService {
 			initiativeTransfers.getTransfers().add(transfer.toDto());
 		}
 		
-		for (Initiative subInitiative : initiativeRepository.findInitiativesWithRelationship(initiative.getId(), InitiativeRelationshipType.IS_DETACHED_SUB)) {
+		for (Initiative subInitiative : initiativeRepository.findInitiativesWithRelationship(initiative.getId(), InitiativeRelationshipType.IS_ATTACHED_SUB)) {
 			/** Recursive */
 			initiativeTransfers.getSubinitiativesTransfers().add(getTransfersToSubInitiatives(subInitiative.getId()));
 		}
@@ -276,7 +276,7 @@ public class TokenTransferService {
 
 		/* get of sub-initiatives */
 		List<InitiativeRelationship> subinitiativesRelationships = 
-				initiativeRelationshipRepository.findByOfInitiativeIdAndType(initiative.getId(), InitiativeRelationshipType.IS_DETACHED_SUB);
+				initiativeRelationshipRepository.findByOfInitiativeIdAndType(initiative.getId(), InitiativeRelationshipType.IS_ATTACHED_SUB);
 		
 		List<TransferDto> transferredToSubinitiatives = new ArrayList<TransferDto>();
 		

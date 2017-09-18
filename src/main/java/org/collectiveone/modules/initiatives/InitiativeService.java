@@ -15,6 +15,17 @@ import org.collectiveone.modules.governance.DecisionMaker;
 import org.collectiveone.modules.governance.DecisionMakerRole;
 import org.collectiveone.modules.governance.Governance;
 import org.collectiveone.modules.governance.GovernanceService;
+import org.collectiveone.modules.initiatives.dto.InitiativeDto;
+import org.collectiveone.modules.initiatives.dto.InitiativeMembersDto;
+import org.collectiveone.modules.initiatives.dto.InitiativeTagDto;
+import org.collectiveone.modules.initiatives.dto.MemberDto;
+import org.collectiveone.modules.initiatives.dto.NewInitiativeDto;
+import org.collectiveone.modules.initiatives.dto.SearchFiltersDto;
+import org.collectiveone.modules.initiatives.repositories.InitiativeMetaRepositoryIf;
+import org.collectiveone.modules.initiatives.repositories.InitiativeRelationshipRepositoryIf;
+import org.collectiveone.modules.initiatives.repositories.InitiativeRepositoryIf;
+import org.collectiveone.modules.initiatives.repositories.InitiativeTagRepositoryIf;
+import org.collectiveone.modules.initiatives.repositories.MemberRepositoryIf;
 import org.collectiveone.modules.tokens.AssetsDto;
 import org.collectiveone.modules.tokens.InitiativeTransfer;
 import org.collectiveone.modules.tokens.InitiativeTransferRepositoryIf;
@@ -62,8 +73,43 @@ public class InitiativeService {
 	@Autowired
 	private InitiativeMetaRepositoryIf initiativeMetaRepository;
 	
+	@Autowired
+	private InitiativeTagRepositoryIf initiativeTagRepository;
 	  
 	
+	@Transactional
+	public Boolean canAccess(UUID initiativeId, UUID userId) {
+		InitiativeVisibility visibility = initiativeRepository.getVisiblity(initiativeId);
+		
+		if (visibility != null) {
+			switch (visibility) {
+				case PRIVATE:
+					/* if private, only members can access initiative data */
+					Boolean isMember = memberRepository.findMemberId(initiativeId, userId) != null;
+					return isMember;				
+					
+				case PUBLIC:
+					return true;
+					
+				case INHERITED:
+				default:
+					return canAccessInherited(initiativeId, userId);
+			}
+		} else {
+			return canAccessInherited(initiativeId, userId);
+		}
+	}
+	
+	private Boolean canAccessInherited(UUID initiativeId, UUID userId) {
+		Initiative parent = initiativeRepository.findOfInitiativesWithRelationship(initiativeId, InitiativeRelationshipType.IS_ATTACHED_SUB);
+		if (parent != null) {
+			return canAccess(parent.getId(), userId);
+		} else {
+			Boolean isMember = memberRepository.findMemberId(initiativeId, userId) != null;
+			return isMember;
+		}
+	}
+
 	/** Non-transactional method to create an initiative in multiple transactions */
 	public PostResult init(UUID userId, NewInitiativeDto initiativeDto) {
 	
@@ -203,7 +249,7 @@ public class InitiativeService {
 			/* if it is a sub-initiative, then link to parent initiative */
 			InitiativeRelationship relationship = new InitiativeRelationship();
 			relationship.setInitiative(initiative);
-			relationship.setType(InitiativeRelationshipType.IS_DETACHED_SUB);
+			relationship.setType(InitiativeRelationshipType.IS_ATTACHED_SUB);
 			relationship.setOfInitiative(parent);
 			
 			relationship = initiativeRelationshipRepository.save(relationship);
@@ -251,6 +297,16 @@ public class InitiativeService {
 		initiativeMeta.setDriver(initiativeDto.getDriver());
 		initiativeMeta.setColor(initiativeDto.getColor());
 		initiativeMeta.setModelEnabled(initiativeDto.getModelEnabled());
+		if (initiativeDto.getVisibility() != null) {
+			initiativeMeta.setVisibility(InitiativeVisibility.valueOf(initiativeDto.getVisibility()));
+		}
+		
+		/* remove and add all tags */
+		initiativeMeta.getTags().removeAll(initiativeMeta.getTags());
+		for (InitiativeTagDto tagDto : initiativeDto.getTags()) {
+			InitiativeTag tag = initiativeTagRepository.findById(UUID.fromString(tagDto.getId()));
+			initiativeMeta.getTags().add(tag);
+		}
 		
 		initiativeMetaRepository.save(initiativeMeta);
 		
@@ -267,14 +323,14 @@ public class InitiativeService {
 	public PostResult delete(UUID initiativeId, UUID userId) {
 		Initiative initiative = initiativeRepository.findById(initiativeId);
 		
-		List<Initiative> subiniatiatives = initiativeRepository.findInitiativesWithRelationship(initiative.getId(), InitiativeRelationshipType.IS_DETACHED_SUB);
+		List<Initiative> subiniatiatives = initiativeRepository.findInitiativesWithRelationship(initiative.getId(), InitiativeRelationshipType.IS_ATTACHED_SUB);
 		
 		for (Initiative subinitiative : subiniatiatives) {
 			/* first delete all subinitiatives (recursively starting from the lower level )*/
 			delete(subinitiative.getId(), userId);
 		}
 		
-		Initiative parent = initiativeRepository.findOfInitiativesWithRelationship(initiativeId, InitiativeRelationshipType.IS_DETACHED_SUB);
+		Initiative parent = initiativeRepository.findOfInitiativesWithRelationship(initiativeId, InitiativeRelationshipType.IS_ATTACHED_SUB);
 		if (parent != null) {
 			/* transfer all assets back to parent */
 			tokenTransferService.transferAllFromInitiativeToInitiative(initiative.getId(), parent.getId(), userId, "initiative deleted", "");
@@ -353,6 +409,11 @@ public class InitiativeService {
 	@Transactional
 	public List<Initiative> getSuperInitiativesOfMember(UUID userC1Id) {
 		List<Initiative> allInitiatives = initiativeRepository.findOfMember(userC1Id);
+		return onlySuperInitiatives(allInitiatives);
+	}
+	
+	@Transactional
+	public List<Initiative> onlySuperInitiatives(List<Initiative> allInitiatives) {
 		List<Initiative> superInitiatives = new ArrayList<Initiative>();
 		
 		for (Initiative thisInitiative : allInitiatives) {
@@ -387,12 +448,12 @@ public class InitiativeService {
 	@Transactional
 	public List<Initiative> getParentInitiatives(UUID initiativeId) {
 		List<Initiative> parents = new ArrayList<Initiative>();
-		Initiative parent = initiativeRepository.findOfInitiativesWithRelationship(initiativeId, InitiativeRelationshipType.IS_DETACHED_SUB);
+		Initiative parent = initiativeRepository.findOfInitiativesWithRelationship(initiativeId, InitiativeRelationshipType.IS_ATTACHED_SUB);
 		
 		while(parent != null) {
 			/* look upwards until an initiative with no parent is found */
 			parents.add(parent);
-			parent = initiativeRepository.findOfInitiativesWithRelationship(parent.getId(), InitiativeRelationshipType.IS_DETACHED_SUB);
+			parent = initiativeRepository.findOfInitiativesWithRelationship(parent.getId(), InitiativeRelationshipType.IS_ATTACHED_SUB);
 		}
 		
 		return parents;
@@ -411,7 +472,7 @@ public class InitiativeService {
 	@Transactional
 	public List<InitiativeDto> getSubinitiativesTree(UUID initiativeId, UUID userId) {
 		Initiative initiative = initiativeRepository.findById(initiativeId); 
-		List<Initiative> subIniatiatives = initiativeRepository.findInitiativesWithRelationship(initiative.getId(), InitiativeRelationshipType.IS_DETACHED_SUB);
+		List<Initiative> subIniatiatives = initiativeRepository.findInitiativesWithRelationship(initiative.getId(), InitiativeRelationshipType.IS_ATTACHED_SUB);
 		
 		List<InitiativeDto> subinitiativeDtos = new ArrayList<InitiativeDto>();
 		
@@ -436,6 +497,11 @@ public class InitiativeService {
 	
 	@Transactional
 	public MemberDto getMember(UUID initiativeId, UUID userId) {
+		
+		if (userId == null) {
+			return null;
+		}
+		
 		Initiative initiative = initiativeRepository.findById(initiativeId);
 		Member member = memberRepository.findByInitiative_IdAndUser_C1Id(initiativeId, userId);
 		
@@ -538,11 +604,26 @@ public class InitiativeService {
 	}
 	
 	@Transactional
-	public GetResult<List<InitiativeDto>> searchBy(String q) {
-		List<Initiative> initiatives = initiativeRepository.searchBy(q.toLowerCase());
+	public GetResult<List<InitiativeDto>> searchBy(SearchFiltersDto searchFilters) {
+		
+		List<UUID> tagIds = new ArrayList<UUID>();
+		for (InitiativeTagDto tag : searchFilters.getTags()) {
+			tagIds.add(UUID.fromString(tag.getId()));
+		}
+		
+		List<Initiative> initiatives = null;
+		
+		if (tagIds.size() > 0) {
+			initiatives = initiativeRepository.searchByTagIdAndVisibility(tagIds, InitiativeVisibility.PUBLIC);	
+		} else {
+			initiatives = initiativeRepository.findByMeta_Visibility(InitiativeVisibility.PUBLIC);
+		}
+		
+		List<Initiative> superInitiatives = onlySuperInitiatives(initiatives);
+		
 		List<InitiativeDto> initiativesDtos = new ArrayList<InitiativeDto>();
 		
-		for(Initiative initiative : initiatives) {
+		for(Initiative initiative : superInitiatives) {
 			initiativesDtos.add(initiative.toDto());
 		}
 		
@@ -567,4 +648,73 @@ public class InitiativeService {
 		
 		return member;
 	}
+
+
+	@Transactional
+	public InitiativeTag getOrCreateTag(InitiativeTagDto tagDto) {
+		InitiativeTag tag = initiativeTagRepository.findByTagText(tagDto.getTagText());
+		
+		if (tag == null) {
+			tag = new InitiativeTag();
+			
+			tag.setTagText(tagDto.getTagText());
+			tag.setDescription(tagDto.getDescription());
+			
+			tag = initiativeTagRepository.save(tag);
+		}
+		
+		return tag;
+	}
+	
+	@Transactional
+	public PostResult addTagToInitiative(UUID initiativeId, InitiativeTagDto tagDto) {
+		
+		Initiative initiative = initiativeRepository.findById(initiativeId);
+		if (initiative == null) return new PostResult("error", "initiative not found", "");
+		
+		InitiativeTag tag = getOrCreateTag(tagDto);
+		initiative.getMeta().getTags().add(tag);
+		
+		return new PostResult("success", "tag added to initiative", tag.getId().toString());
+	}
+	
+	@Transactional
+	public PostResult deleteTagFromInitiative(UUID initiativeId, UUID tagId) {
+		
+		Initiative initiative = initiativeRepository.findById(initiativeId);
+		if (initiative == null) return new PostResult("error", "initiative not found", "");
+		
+		InitiativeTag tag = initiativeTagRepository.findById(tagId);
+		if (tag == null) return new PostResult("error", "tag not found", "");
+		
+		initiative.getMeta().getTags().remove(tag);
+		
+		return new PostResult("success", "tag added to initiative", initiative.getId().toString());
+	}
+	
+	
+	@Transactional
+	public GetResult<List<InitiativeTagDto>> searchTagsBy(String q) {
+		List<InitiativeTag> tags = initiativeTagRepository.findTop10ByTagTextLikeIgnoreCase("%"+q+"%");
+		
+		List<InitiativeTagDto> tagsDtos = new ArrayList<InitiativeTagDto>();
+		
+		for(InitiativeTag tag : tags) {
+			tagsDtos.add(tag.toDto());
+		}
+		
+		return new GetResult<List<InitiativeTagDto>>("succes", "initiatives returned", tagsDtos);
+	}
+	
+	@Transactional
+	public GetResult<InitiativeTagDto> getTag(UUID tagId) {
+		InitiativeTag tag = initiativeTagRepository.findById(tagId);
+		
+		if (tag == null) {
+			return new GetResult<InitiativeTagDto>("error", "initiative tag not found", null); 
+		}
+		
+		return new GetResult<InitiativeTagDto>("success", "initiative tag returned", tag.toDto());
+	}
+	
 }
