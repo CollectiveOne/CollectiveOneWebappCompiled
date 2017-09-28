@@ -532,16 +532,8 @@ public class ModelService {
 		
 		List<ModelCardWrapperDto> cardsDtos = new ArrayList<ModelCardWrapperDto>();
 		
-		for(ModelCardWrapper cardWrapper : enititiesPage.getContent()) {
-			List<ModelSection> inSections = modelCardWrapperRepository.findParentSections(cardWrapper.getId());
-			
-			ModelCardWrapperDto cardWrapperDto = cardWrapper.toDto();
-			
-			for (ModelSection section : inSections) {
-				cardWrapperDto.getInSections().add(section.toDto());
-			}
-			
-			cardsDtos.add(cardWrapperDto);
+		for(ModelCardWrapper card : enititiesPage.getContent()) {
+			cardsDtos.add(card.toDto());
 		}
 		
 		Page<ModelCardWrapperDto> dtosPage = new PageImpl<ModelCardWrapperDto>(cardsDtos, page, enititiesPage.getNumberOfElements());
