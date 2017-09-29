@@ -8,6 +8,8 @@ import javax.transaction.Transactional;
 
 import org.collectiveone.common.dto.GetResult;
 import org.collectiveone.common.dto.PostResult;
+import org.collectiveone.modules.files.FileStored;
+import org.collectiveone.modules.files.FileStoredRepositoryIf;
 import org.collectiveone.modules.initiatives.Initiative;
 import org.collectiveone.modules.initiatives.InitiativeService;
 import org.collectiveone.modules.initiatives.repositories.InitiativeRepositoryIf;
@@ -46,6 +48,9 @@ public class ModelService {
 	
 	@Autowired
 	private ModelCardRepositoryIf modelCardRepository;
+	
+	@Autowired
+	private FileStoredRepositoryIf fileStoredRepository;
 	
 	
 	@Transactional
@@ -218,7 +223,7 @@ public class ModelService {
 	}
 	
 	@Transactional
-	public PostResult removeSubsectionFromSection (UUID sectionId, UUID subsectionId) {
+	public PostResult removeSubsectionFromSection(UUID sectionId, UUID subsectionId) {
 		
 		ModelSection section = modelSectionRepository.findById(sectionId);
 		ModelSection subsection = modelSectionRepository.findById(subsectionId);
@@ -227,6 +232,18 @@ public class ModelService {
 		section = modelSectionRepository.save(section);
 		
 		return new PostResult("success", "subsection removed to section", section.getId().toString());
+	}
+	
+	@Transactional
+	public PostResult removeSubsectionFromView(UUID viewId, UUID sectionId) {
+		
+		ModelView view = modelViewRepository.findById(viewId);
+		ModelSection section = modelSectionRepository.findById(sectionId);
+		
+		view.getSections().remove(section);
+		view = modelViewRepository.save(view);
+		
+		return new PostResult("success", "section removed to view", view.getId().toString());
 	}
 	
 	@Transactional
@@ -353,12 +370,19 @@ public class ModelService {
 	}
 		
 	@Transactional
-	public PostResult addCardToSection (UUID sectionId, UUID cardWrapperId) {
+	public PostResult addCardToSection (UUID sectionId, UUID cardWrapperId, UUID beforeCardWrapperId) {
 		
 		ModelSection section = modelSectionRepository.findById(sectionId);
 		ModelCardWrapper cardWrapper = modelCardWrapperRepository.findById(cardWrapperId);
 		
-		section.getCardsWrappers().add(cardWrapper);
+		if (beforeCardWrapperId == null) {
+			section.getCardsWrappers().add(cardWrapper);
+		} else {
+			ModelCardWrapper beforeCardWrapper = modelCardWrapperRepository.findById(beforeCardWrapperId);
+			int index = section.getCardsWrappers().indexOf(beforeCardWrapper);
+			section.getCardsWrappers().add(index, cardWrapper);
+		}
+		
 		section = modelSectionRepository.save(section);
 		
 		return new PostResult("success", "card added to section", section.getId().toString());
@@ -440,7 +464,10 @@ public class ModelService {
 		ModelSection section = modelSectionRepository.findById(sectionId);
 		if (section == null) return new PostResult("error", "view not found", "");
 		
-		ModelCard card = cardDto.toEntity(null, cardDto);
+		UUID imageFileId = cardDto.getNewImageFileId().equals("") ? null : UUID.fromString(cardDto.getNewImageFileId());
+		FileStored imageFile = fileStoredRepository.findById(imageFileId);
+		
+		ModelCard card = cardDto.toEntity(null, cardDto, imageFile);
 		card = modelCardRepository.save(card);
 		
 		ModelCardWrapper cardWrapper = new ModelCardWrapper();
@@ -467,14 +494,25 @@ public class ModelService {
 		
 		cardWrapper.getOldVersions().add(cardWrapper.getCard());
 		
-		ModelCard card = cardDto.toEntity(null, cardDto);
+		
+		UUID imageFileId = cardDto.getNewImageFileId().equals("") ? null : UUID.fromString(cardDto.getNewImageFileId());
+		FileStored imageFile = fileStoredRepository.findById(imageFileId);
+		
+		ModelCard card = cardDto.toEntity(null, cardDto, imageFile);
+		
+		/* remove image has dirty solution */
+		if(cardDto.getNewImageFileId().equals("REMOVE")) {
+			card.setImageFile(null);
+		}
+		
 		card = modelCardRepository.save(card);
 		
 		cardWrapper.setCard(card);
 		cardWrapper.setOtherProperties(cardDto);
 		
-		return new PostResult("success", "section edited", cardWrapper.getId().toString());
+		return new PostResult("success", "card edited", cardWrapper.getId().toString());
 	}
+	
 	
 	@Transactional
 	public PostResult moveCardWrapper(UUID fromSectionId, UUID cardWrapperId, UUID toSectionId, UUID beforeCardWrapperId) {
@@ -526,14 +564,27 @@ public class ModelService {
 	}
 	
 	@Transactional
+	public Initiative getCardWrapperInitiative(UUID cardWrapperId) {
+		return modelCardWrapperRepository.findById(cardWrapperId).getInitiative();
+	}
+	
+	@Transactional
 	public GetResult<Page<ModelCardWrapperDto>> searchCardWrapper(String query, PageRequest page, UUID initiativeId) {
 		List<UUID> initiativeEcosystemIds = initiativeService.findAllInitiativeEcosystemIds(initiativeId);
 		Page<ModelCardWrapper> enititiesPage = modelCardWrapperRepository.searchBy("%"+query.toLowerCase()+"%", initiativeEcosystemIds, page);
 		
 		List<ModelCardWrapperDto> cardsDtos = new ArrayList<ModelCardWrapperDto>();
 		
-		for(ModelCardWrapper card : enititiesPage.getContent()) {
-			cardsDtos.add(card.toDto());
+		for(ModelCardWrapper cardWrapper : enititiesPage.getContent()) {
+			List<ModelSection> inSections = modelCardWrapperRepository.findParentSections(cardWrapper.getId());
+			
+			ModelCardWrapperDto cardWrapperDto = cardWrapper.toDto();
+			
+			for (ModelSection section : inSections) {
+				cardWrapperDto.getInSections().add(section.toDto());
+			}
+			
+			cardsDtos.add(cardWrapperDto);
 		}
 		
 		Page<ModelCardWrapperDto> dtosPage = new PageImpl<ModelCardWrapperDto>(cardsDtos, page, enititiesPage.getNumberOfElements());
