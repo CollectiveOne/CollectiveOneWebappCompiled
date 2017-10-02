@@ -2,6 +2,9 @@ package org.collectiveone.modules.activity.dto;
 
 import org.collectiveone.modules.assignations.AssignationDto;
 import org.collectiveone.modules.initiatives.dto.InitiativeDto;
+import org.collectiveone.modules.model.dto.ModelCardWrapperDto;
+import org.collectiveone.modules.model.dto.ModelSectionDto;
+import org.collectiveone.modules.model.dto.ModelViewDto;
 import org.collectiveone.modules.tokens.TokenMintDto;
 import org.collectiveone.modules.tokens.TransferDto;
 import org.collectiveone.modules.users.AppUserDto;
@@ -17,6 +20,15 @@ public class ActivityDto {
 	private TokenMintDto mint;
 	private AssignationDto assignation;
 	private TransferDto transfer;
+	private ModelViewDto modelView;
+	private ModelSectionDto modelSection;
+	private ModelCardWrapperDto modelCardWrapper;
+	
+	private ModelSectionDto onSection;
+	private ModelViewDto onView;
+	
+	private ModelSectionDto fromSection;
+	private ModelViewDto fromView;
 	
 	public String getType() {
 		return type;
@@ -71,6 +83,48 @@ public class ActivityDto {
 	}
 	public void setTransfer(TransferDto transfer) {
 		this.transfer = transfer;
+	}
+	public ModelViewDto getModelView() {
+		return modelView;
+	}
+	public void setModelView(ModelViewDto modelView) {
+		this.modelView = modelView;
+	}
+	public ModelSectionDto getModelSection() {
+		return modelSection;
+	}
+	public void setModelSection(ModelSectionDto modelSection) {
+		this.modelSection = modelSection;
+	}
+	public ModelCardWrapperDto getModelCardWrapper() {
+		return modelCardWrapper;
+	}
+	public void setModelCardWrapper(ModelCardWrapperDto modelCardWrapper) {
+		this.modelCardWrapper = modelCardWrapper;
+	}
+	public ModelSectionDto getOnSection() {
+		return onSection;
+	}
+	public void setOnSection(ModelSectionDto onSection) {
+		this.onSection = onSection;
+	}
+	public ModelViewDto getOnView() {
+		return onView;
+	}
+	public void setOnView(ModelViewDto onView) {
+		this.onView = onView;
+	}
+	public ModelSectionDto getFromSection() {
+		return fromSection;
+	}
+	public void setFromSection(ModelSectionDto fromSection) {
+		this.fromSection = fromSection;
+	}
+	public ModelViewDto getFromView() {
+		return fromView;
+	}
+	public void setFromView(ModelViewDto fromView) {
+		this.fromView = fromView;
 	}
 	
 }

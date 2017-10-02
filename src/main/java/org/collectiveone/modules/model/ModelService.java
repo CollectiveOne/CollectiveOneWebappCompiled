@@ -8,6 +8,7 @@ import javax.transaction.Transactional;
 
 import org.collectiveone.common.dto.GetResult;
 import org.collectiveone.common.dto.PostResult;
+import org.collectiveone.modules.activity.ActivityService;
 import org.collectiveone.modules.files.FileStored;
 import org.collectiveone.modules.files.FileStoredRepositoryIf;
 import org.collectiveone.modules.initiatives.Initiative;
@@ -22,6 +23,7 @@ import org.collectiveone.modules.model.repositories.ModelCardRepositoryIf;
 import org.collectiveone.modules.model.repositories.ModelCardWrapperRepositoryIf;
 import org.collectiveone.modules.model.repositories.ModelSectionRepositoryIf;
 import org.collectiveone.modules.model.repositories.ModelViewRepositoryIf;
+import org.collectiveone.modules.users.AppUserRepositoryIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -35,7 +37,13 @@ public class ModelService {
 	private InitiativeService initiativeService;
 	
 	@Autowired
+	private ActivityService activityService;
+	
+	@Autowired
 	private InitiativeRepositoryIf initiativeRepository;
+	
+	@Autowired
+	private AppUserRepositoryIf appUserRepository;
 	
 	@Autowired
 	private ModelViewRepositoryIf modelViewRepository;
@@ -100,6 +108,8 @@ public class ModelService {
 		ModelView view = viewDto.toEntity(null, viewDto, initiative);
 		view = modelViewRepository.save(view);
 		
+		activityService.modelViewCreated(view, appUserRepository.findByC1Id(creatorId));
+		
 		return new PostResult("success", "view created", view.getId().toString());
 	}
 	
@@ -113,6 +123,8 @@ public class ModelService {
 		
 		view = viewDto.toEntity(view, viewDto, initiative);
 		view = modelViewRepository.save(view);
+		
+		activityService.modelViewEdited(view, appUserRepository.findByC1Id(creatorId));
 		
 		return new PostResult("success", "view edited", view.getId().toString());
 	}
@@ -133,9 +145,18 @@ public class ModelService {
 	public PostResult deleteView (UUID viewId, UUID creatorId) {
 		
 		ModelView view = modelViewRepository.findById(viewId);
-		modelViewRepository.delete(view);
 		
-		return new PostResult("success", "view deleted", "");
+		Initiative initiative = view.getInitiative();
+		
+		initiative.getModelViews().remove(view);
+		initiative.getModelViewsTrash().add(view);
+		
+		initiativeRepository.save(initiative);
+		view = modelViewRepository.save(view);
+		
+		activityService.modelViewDeleted(view, appUserRepository.findByC1Id(creatorId));
+		
+		return new PostResult("success", "view deleted", view.getId().toString());
 	}
 	
 	@Transactional
@@ -151,6 +172,8 @@ public class ModelService {
 			parent.getSubsections().add(section);
 			section.setInitiative(parent.getInitiative());
 			
+			activityService.modelSectionCreatedOnSection(section, parent, appUserRepository.findByC1Id(creatorId));
+			
 			modelSectionRepository.save(parent);
 			
 		} else {
@@ -159,6 +182,8 @@ public class ModelService {
 			
 			view.getSections().add(section);
 			section.setInitiative(view.getInitiative());
+			
+			activityService.modelSectionCreatedOnView(section, view, appUserRepository.findByC1Id(creatorId));
 			
 			modelViewRepository.save(view);
 		}
@@ -219,35 +244,51 @@ public class ModelService {
 		section = sectionDto.toEntity(section, sectionDto);
 		section = modelSectionRepository.save(section);
 		
+		activityService.modelSectionEdited(section, appUserRepository.findByC1Id(creatorId));
+		
 		return new PostResult("success", "section edited", section.getId().toString());
 	}
 	
 	@Transactional
-	public PostResult removeSubsectionFromSection(UUID sectionId, UUID subsectionId) {
+	public PostResult removeSubsectionFromSection(UUID sectionId, UUID subsectionId, UUID creatorId) {
 		
 		ModelSection section = modelSectionRepository.findById(sectionId);
 		ModelSection subsection = modelSectionRepository.findById(subsectionId);
 		
 		section.getSubsections().remove(subsection);
+		section.getSubsectionsTrash().add(subsection);
+		
 		section = modelSectionRepository.save(section);
+		
+		activityService.modelSectionRemovedFromSection(subsection, section, appUserRepository.findByC1Id(creatorId));
 		
 		return new PostResult("success", "subsection removed to section", section.getId().toString());
 	}
 	
 	@Transactional
-	public PostResult removeSubsectionFromView(UUID viewId, UUID sectionId) {
+	public PostResult removeSubsectionFromView(UUID viewId, UUID sectionId, UUID creatorId) {
 		
 		ModelView view = modelViewRepository.findById(viewId);
 		ModelSection section = modelSectionRepository.findById(sectionId);
 		
 		view.getSections().remove(section);
+		view.getSectionsTrash().add(section);
+		
 		view = modelViewRepository.save(view);
+		
+		activityService.modelSectionRemovedFromView(section, view, appUserRepository.findByC1Id(creatorId));
 		
 		return new PostResult("success", "section removed to view", view.getId().toString());
 	}
 	
 	@Transactional
-	public PostResult moveSection(UUID fromViewId, UUID sectionId, UUID beforeViewSectionId, UUID toSectionId, UUID beforeSubsectionId) {
+	public PostResult moveSection(
+			UUID fromViewId, 
+			UUID sectionId, 
+			UUID beforeViewSectionId, 
+			UUID toSectionId, 
+			UUID beforeSubsectionId,
+			UUID creatorId) {
 		/* move a section within a view (it must be one of the top level sections of the view) */
 		
 		if (sectionId.equals(beforeViewSectionId)) {
@@ -273,6 +314,8 @@ public class ModelService {
 			modelViewRepository.save(view);
 			modelSectionRepository.save(section);
 			
+			activityService.modelSectionMovedInView(section, view, appUserRepository.findByC1Id(creatorId));
+			
 		} else {
 			/* if toSectionId is not null, then moving section from view to section */
 			ModelSection toSection = modelSectionRepository.findById(toSectionId);
@@ -286,6 +329,8 @@ public class ModelService {
 			}
 			section.setInitiative(toSection.getInitiative());
 			
+			activityService.modelSectionMovedFromViewToSection(section, view, toSection, appUserRepository.findByC1Id(creatorId));
+			
 			modelSectionRepository.save(toSection);
 			modelSectionRepository.save(section);
 		}
@@ -294,7 +339,13 @@ public class ModelService {
 	}
 	
 	@Transactional
-	public PostResult moveSubsection(UUID fromSectionId, UUID subSectionId, UUID toViewId, UUID toSectionId, UUID beforeSubsectionId) {
+	public PostResult moveSubsection(
+			UUID fromSectionId, 
+			UUID subSectionId, 
+			UUID toViewId, 
+			UUID toSectionId, 
+			UUID beforeSubsectionId,
+			UUID creatorId) {
 		/* move a subsection to another section or subsection or, as top section, to a view */
 		
 		if (subSectionId.equals(toSectionId)) {
@@ -310,7 +361,7 @@ public class ModelService {
 	
 		if(toViewId == null) {
 			/* moving to another section add to section as subsection */
-			ModelSection toSection = modelSectionRepository.findById(fromSectionId);
+			ModelSection toSection = modelSectionRepository.findById(toSectionId);
 			
 			if (beforeSubsectionId != null) {
 				ModelSection beforeSubsection = modelSectionRepository.findById(beforeSubsectionId);
@@ -320,6 +371,8 @@ public class ModelService {
 				toSection.getSubsections().add(subSection);
 			}
 			subSection.setInitiative(toSection.getInitiative());
+			
+			activityService.modelSectionMovedFromSectionToSection(subSection, fromSection, toSection, appUserRepository.findByC1Id(creatorId));
 			
 			modelSectionRepository.save(toSection);
 			modelSectionRepository.save(subSection);
@@ -337,6 +390,8 @@ public class ModelService {
 			}
 			subSection.setInitiative(toView.getInitiative());
 			
+			activityService.modelSectionMovedFromSectionToView(subSection, fromSection, toView, appUserRepository.findByC1Id(creatorId));
+			
 			modelViewRepository.save(toView);
 			modelSectionRepository.save(subSection);
 		}
@@ -345,7 +400,7 @@ public class ModelService {
 	}
 	
 	@Transactional
-	public PostResult addSection (UUID sectionId, UUID onSectionId, UUID onViewId, UUID userId) {
+	public PostResult addSection (UUID sectionId, UUID onSectionId, UUID onViewId, UUID creatorId) {
 		
 		ModelSection section = modelSectionRepository.findById(sectionId);
 		
@@ -356,6 +411,8 @@ public class ModelService {
 			onSection.getSubsections().add(section);
 			onSection = modelSectionRepository.save(onSection);
 			
+			activityService.modelNewSubsection(section, onSection, appUserRepository.findByC1Id(creatorId));
+			
 			return new PostResult("success", "section added to section", section.getId().toString());
 			
 		} else {
@@ -365,12 +422,14 @@ public class ModelService {
 			onView.getSections().add(section);
 			onView = modelViewRepository.save(onView);
 			
+			activityService.modelNewSection(section, onView, appUserRepository.findByC1Id(creatorId));
+			
 			return new PostResult("success", "section added to view", section.getId().toString());
 		}
 	}
 		
 	@Transactional
-	public PostResult addCardToSection (UUID sectionId, UUID cardWrapperId, UUID beforeCardWrapperId) {
+	public PostResult addCardToSection (UUID sectionId, UUID cardWrapperId, UUID beforeCardWrapperId, UUID creatorId) {
 		
 		ModelSection section = modelSectionRepository.findById(sectionId);
 		ModelCardWrapper cardWrapper = modelCardWrapperRepository.findById(cardWrapperId);
@@ -385,17 +444,23 @@ public class ModelService {
 		
 		section = modelSectionRepository.save(section);
 		
+		activityService.modelCardWrapperAdded(cardWrapper, section, appUserRepository.findByC1Id(creatorId));
+		
 		return new PostResult("success", "card added to section", section.getId().toString());
 	}
 	
 	@Transactional
-	public PostResult removeCardFromSection (UUID sectionId, UUID cardWrapperId) {
+	public PostResult removeCardFromSection (UUID sectionId, UUID cardWrapperId, UUID creatorId) {
 		
 		ModelSection section = modelSectionRepository.findById(sectionId);
 		ModelCardWrapper cardWrapper = modelCardWrapperRepository.findById(cardWrapperId);
 		
 		section.getCardsWrappers().remove(cardWrapper);
+		section.getCardsWrappersTrash().add(cardWrapper);
+		
 		section = modelSectionRepository.save(section);
+		
+		activityService.modelCardWrapperRemoved(cardWrapper, section, appUserRepository.findByC1Id(creatorId));
 		
 		return new PostResult("success", "card added to section", section.getId().toString());
 	}
@@ -442,6 +507,7 @@ public class ModelService {
 		if (views.size() > 0) {
 			for (ModelView view : views) {
 				view.getSections().remove(section);
+				view.getSectionsTrash().add(section);
 			}
 		}
 		
@@ -450,12 +516,16 @@ public class ModelService {
 		if (parents.size() > 0) {
 			for (ModelSection parent : parents) {
 				parent.getSubsections().remove(section);
+				parent.getSubsectionsTrash().add(section);
 			}
 		}
 		
-		modelSectionRepository.delete(section);
 		
-		return new PostResult("success", "section deleted", "");
+		section = modelSectionRepository.save(section);
+		
+		activityService.modelSectionDeleted(section, appUserRepository.findByC1Id(creatorId));
+		
+		return new PostResult("success", "section deleted", section.getId().toString());
 	}
 	
 	@Transactional
@@ -483,6 +553,8 @@ public class ModelService {
 		
 		section.getCardsWrappers().add(cardWrapper);
 		modelSectionRepository.save(section);
+		
+		activityService.modelCardWrapperCreated(cardWrapper, section, appUserRepository.findByC1Id(creatorId));
 		
 		return new PostResult("success", "card created", card.getId().toString());
 	}
@@ -521,12 +593,14 @@ public class ModelService {
 		cardWrapper.setCard(card);
 		cardWrapper.setOtherProperties(cardDto);
 		
+		activityService.modelCardWrapperEdited(cardWrapper, appUserRepository.findByC1Id(creatorId));
+		
 		return new PostResult("success", "card edited", cardWrapper.getId().toString());
 	}
 	
 	
 	@Transactional
-	public PostResult moveCardWrapper(UUID fromSectionId, UUID cardWrapperId, UUID toSectionId, UUID beforeCardWrapperId) {
+	public PostResult moveCardWrapper(UUID fromSectionId, UUID cardWrapperId, UUID toSectionId, UUID beforeCardWrapperId, UUID creatorId) {
 		
 		if (cardWrapperId.equals(beforeCardWrapperId)) {
 			return new PostResult("error", "cannot move on itself", null);
@@ -556,6 +630,8 @@ public class ModelService {
 		
 		modelSectionRepository.save(toSection);
 		modelCardWrapperRepository.save(cardWrapper);
+		
+		activityService.modelCardWrapperMoved(cardWrapper, fromSection, toSection, appUserRepository.findByC1Id(creatorId));
 		
 		return new PostResult("success", "card moved", cardWrapper.getId().toString());
 	}
@@ -606,20 +682,22 @@ public class ModelService {
 	@Transactional
 	public PostResult deleteCardWrapper (UUID cardWrapperId, UUID creatorId) {
 		
-		List<ModelSection> parents = modelCardWrapperRepository.findParentSections(cardWrapperId);
-		ModelCardWrapper card = modelCardWrapperRepository.findById(cardWrapperId);
 		
-		/* remove references */
+		List<ModelSection> parents = modelCardWrapperRepository.findParentSections(cardWrapperId);
+		ModelCardWrapper cardWrapper = modelCardWrapperRepository.findById(cardWrapperId);
+		
+		/* remove from all sections */
 		if (parents.size() > 0) {
 			for (ModelSection parent : parents) {
-				parent.getCardsWrappers().remove(card);
+				parent.getCardsWrappers().remove(cardWrapper);
+				parent.getCardsWrappersTrash().add(cardWrapper);
 				modelSectionRepository.save(parent);
 			}
 		}
 		
-		modelCardWrapperRepository.delete(card);
+		activityService.modelCardWrapperDeleted(cardWrapper, appUserRepository.findByC1Id(creatorId));
 		
-		return new PostResult("success", "section deleted", "");
+		return new PostResult("success", "section deleted", cardWrapper.getId().toString());
 	}
 	
 	

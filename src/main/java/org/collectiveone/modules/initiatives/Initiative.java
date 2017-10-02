@@ -17,6 +17,7 @@ import javax.persistence.Id;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
+import javax.persistence.OrderColumn;
 import javax.persistence.Table;
 
 import org.collectiveone.modules.governance.Governance;
@@ -62,9 +63,13 @@ public class Initiative {
 	@OneToOne
 	private InitiativeMeta meta;	
 	
-	@OneToMany(mappedBy = "initiative")
+	@OneToMany
+	@OrderColumn(name = "views_order")
 	private List<ModelView> modelViews = new ArrayList<ModelView>();
 	
+	@OneToMany
+	@OrderColumn(name = "views_order")
+	private List<ModelView> modelViewsTrash = new ArrayList<ModelView>();
 	
 	public InitiativeDto toDto() {
 		InitiativeDto dto = new InitiativeDto();
@@ -133,6 +138,12 @@ public class Initiative {
 	}
 	public void setModelViews(List<ModelView> modelViews) {
 		this.modelViews = modelViews;
+	}
+	public List<ModelView> getModelViewsTrash() {
+		return modelViewsTrash;
+	}
+	public void setModelViewsTrash(List<ModelView> modelViewsTrash) {
+		this.modelViewsTrash = modelViewsTrash;
 	}
 	
 }

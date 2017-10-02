@@ -52,6 +52,9 @@ public class ModelCardWrapper {
 	@OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<ModelCard> oldVersions = new ArrayList<ModelCard>();
 	
+	
+	
+	
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -80,6 +83,7 @@ public class ModelCardWrapper {
 		cardWrapperDto.setCard(card.toDto());
 		cardWrapperDto.setStateControl(stateControl);
 		if (state != null) cardWrapperDto.setState(state.toString());
+		if (initiative != null) cardWrapperDto.setInitiativeId(initiative.getId().toString());
 		if (targetDate != null) cardWrapperDto.setTargetDate(targetDate.getTime());
 		
 		return cardWrapperDto;
@@ -87,7 +91,7 @@ public class ModelCardWrapper {
 	
 	public void setOtherProperties(ModelCardDto cardDto) {
 		setStateControl(cardDto.getStateControl());
-		if (cardDto.getState() != null) setState(ModelCardState.valueOf(cardDto.getState()));
+		setState(ModelCardState.valueOf(cardDto.getState()));
 		if (cardDto.getTargetDate() != null) setTargetDate(new Timestamp(cardDto.getTargetDate()));
 	}
 	
@@ -107,7 +111,7 @@ public class ModelCardWrapper {
 	public void setInitiative(Initiative initiative) {
 		this.initiative = initiative;
 	}
-
+	
 	public ModelCard getCard() {
 		return card;
 	}
@@ -131,7 +135,7 @@ public class ModelCardWrapper {
 	public void setStateControl(Boolean stateControl) {
 		this.stateControl = stateControl;
 	}
-
+	
 	public ModelCardState getState() {
 		return state;
 	}

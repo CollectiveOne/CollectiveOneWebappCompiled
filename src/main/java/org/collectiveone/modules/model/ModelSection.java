@@ -45,12 +45,18 @@ public class ModelSection {
 	@OrderColumn(name = "cards_order")
 	private List<ModelCardWrapper> cardsWrappers = new ArrayList<ModelCardWrapper>();
 	
+	@ManyToMany
+	private List<ModelCardWrapper> cardsWrappersTrash = new ArrayList<ModelCardWrapper>();
+	
 	/* should be one to many but there seems to be a bug in Hibernate 
 	 * see https://stackoverflow.com/questions/4022509/constraint-violation-in-hibernate-unidirectional-onetomany-mapping-with-jointabl
 	 * */
 	@ManyToMany
 	@OrderColumn(name = "subsections_order")
 	private List<ModelSection> subsections = new ArrayList<ModelSection>();
+	
+	@ManyToMany
+	private List<ModelSection> subsectionsTrash = new ArrayList<ModelSection>();
 	
 	
 	@Override
@@ -82,6 +88,8 @@ public class ModelSection {
 		sectionDto.setDescription(description);
 		sectionDto.setnSubsections(subsections.size());
 		sectionDto.setnCards(cardsWrappers.size());
+		
+		if (initiative != null) sectionDto.setInitiativeId(initiative.getId().toString());
 		
 		return sectionDto;
 	}
@@ -125,6 +133,14 @@ public class ModelSection {
 	public void setCardsWrappers(List<ModelCardWrapper> cardsWrappers) {
 		this.cardsWrappers = cardsWrappers;
 	}
+	
+	public List<ModelCardWrapper> getCardsWrappersTrash() {
+		return cardsWrappersTrash;
+	}
+
+	public void setCardsWrappersTrash(List<ModelCardWrapper> cardsWrappersTrash) {
+		this.cardsWrappersTrash = cardsWrappersTrash;
+	}
 
 	public List<ModelSection> getSubsections() {
 		return subsections;
@@ -132,6 +148,14 @@ public class ModelSection {
 
 	public void setSubsections(List<ModelSection> subsections) {
 		this.subsections = subsections;
+	}
+
+	public List<ModelSection> getSubsectionsTrash() {
+		return subsectionsTrash;
+	}
+
+	public void setSubsectionsTrash(List<ModelSection> subsectionsTrash) {
+		this.subsectionsTrash = subsectionsTrash;
 	}
 	
 	
