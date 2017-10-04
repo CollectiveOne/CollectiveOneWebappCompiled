@@ -90,8 +90,10 @@ public class ModelCardWrapper {
 	}
 	
 	public void setOtherProperties(ModelCardDto cardDto) {
-		setStateControl(cardDto.getStateControl());
-		setState(ModelCardState.valueOf(cardDto.getState()));
+		if (cardDto.getStateControl()) {
+			setStateControl(cardDto.getStateControl());
+			setState(ModelCardState.valueOf(cardDto.getState()));
+		}
 		if (cardDto.getTargetDate() != null) setTargetDate(new Timestamp(cardDto.getTargetDate()));
 	}
 	
