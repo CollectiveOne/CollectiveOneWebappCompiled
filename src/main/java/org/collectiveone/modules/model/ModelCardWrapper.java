@@ -94,9 +94,9 @@ public class ModelCardWrapper {
 			setStateControl(cardDto.getStateControl());
 			setState(ModelCardState.valueOf(cardDto.getState()));
 		}
+		
 		if (cardDto.getTargetDate() != null) setTargetDate(new Timestamp(cardDto.getTargetDate()));
-	}
-	
+	}	
 	
 	public UUID getId() {
 		return id;

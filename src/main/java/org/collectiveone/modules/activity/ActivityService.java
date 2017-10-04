@@ -61,13 +61,33 @@ public class ActivityService {
 	
 	
 	@Transactional
-	public void sendPendingEmails() throws IOException {
+	public void sendEmailsSendNow() throws IOException {
 		
 		List<Notification> notifications = 
 				notificationRepository.findBySubscriber_EmailNotificationsStateAndEmailState(
 						SubscriberEmailNotificationsState.SEND_NOW, NotificationEmailState.PENDING);
 		
-		emailService.sendNotifications(notifications);
+		emailService.sendNotificationsSendNow(notifications);
+	}
+	
+	@Transactional
+	public void sendEmailsOnceADay() throws IOException {
+		
+		List<Notification> notifications = 
+				notificationRepository.findBySubscriber_EmailNotificationsStateAndEmailState(
+						SubscriberEmailNotificationsState.SEND_ONCEADAY, NotificationEmailState.PENDING);
+		
+		emailService.sendNotificationsGrouped(notifications);
+	}
+	
+	@Transactional
+	public void sendEmailsOnceAWeek() throws IOException {
+		
+		List<Notification> notifications = 
+				notificationRepository.findBySubscriber_EmailNotificationsStateAndEmailState(
+						SubscriberEmailNotificationsState.SEND_ONCEAWEEK, NotificationEmailState.PENDING);
+		
+		emailService.sendNotificationsGrouped(notifications);
 	}
 	
 	@Transactional
@@ -87,6 +107,7 @@ public class ActivityService {
 	public PostResult notificationsRead(UUID userId) {
 		for(Notification notification: notificationRepository.findBySubscriber_User_C1IdAndState(userId, NotificationState.PENDING)) {
 			notification.setState(NotificationState.DELIVERED);
+			notification.setEmailState(NotificationEmailState.DELIVERED);
 			notificationRepository.save(notification);
 		}
 		
