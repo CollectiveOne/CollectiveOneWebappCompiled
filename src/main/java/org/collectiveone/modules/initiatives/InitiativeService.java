@@ -12,6 +12,7 @@ import org.collectiveone.common.dto.PostResult;
 import org.collectiveone.modules.activity.Activity;
 import org.collectiveone.modules.activity.ActivityService;
 import org.collectiveone.modules.activity.dto.ActivityDto;
+import org.collectiveone.modules.activity.enums.ActivityType;
 import org.collectiveone.modules.activity.enums.SubscriptionElementType;
 import org.collectiveone.modules.activity.repositories.ActivityRepositoryIf;
 import org.collectiveone.modules.files.FileStored;
@@ -36,12 +37,12 @@ import org.collectiveone.modules.model.dto.ModelSectionDto;
 import org.collectiveone.modules.model.dto.ModelViewDto;
 import org.collectiveone.modules.tokens.AssetsDto;
 import org.collectiveone.modules.tokens.InitiativeTransfer;
-import org.collectiveone.modules.tokens.InitiativeTransferRepositoryIf;
-import org.collectiveone.modules.tokens.TokenHolderType;
 import org.collectiveone.modules.tokens.TokenService;
 import org.collectiveone.modules.tokens.TokenTransferService;
 import org.collectiveone.modules.tokens.TokenType;
-import org.collectiveone.modules.tokens.TransferDto;
+import org.collectiveone.modules.tokens.dto.TransferDto;
+import org.collectiveone.modules.tokens.enums.TokenHolderType;
+import org.collectiveone.modules.tokens.repositories.InitiativeTransferRepositoryIf;
 import org.collectiveone.modules.users.AppUser;
 import org.collectiveone.modules.users.AppUserRepositoryIf;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -281,8 +282,8 @@ public class InitiativeService {
 		initiative.getMembers().add(member);
 		initiativeRepository.save(initiative);
 		
-		if (role.equals(DecisionMakerRole.ADMIN)) {
-			governanceService.addDecisionMaker(initiative.getGovernance().getId(), memberUser.getC1Id(), DecisionMakerRole.ADMIN);
+		if (role.equals(DecisionMakerRole.ADMIN) || role.equals(DecisionMakerRole.EDITOR)) {
+			governanceService.addDecisionMaker(initiative.getGovernance().getId(), memberUser.getC1Id(), role);
 		}
 		
 		/* members are subscribed to initiatives by default */
@@ -752,7 +753,7 @@ public class InitiativeService {
 		if (tagIds.size() > 0) {
 			initiatives = initiativeRepository.searchByTagIdAndVisibility(tagIds, InitiativeVisibility.PUBLIC);	
 		} else {
-			initiatives = initiativeRepository.findByMeta_Visibility(InitiativeVisibility.PUBLIC);
+			initiatives = initiativeRepository.findByVisibility(InitiativeVisibility.PUBLIC);
 		}
 		
 		List<Initiative> superInitiatives = onlySuperInitiatives(initiatives);
@@ -854,7 +855,7 @@ public class InitiativeService {
 	}
 	
 	@Transactional
-	public GetResult<Page<ActivityDto>>  getActivityUnderInitiative(UUID initiativeId, PageRequest page) {
+	public GetResult<Page<ActivityDto>>  getActivityUnderInitiative(UUID initiativeId, PageRequest page, Boolean onlyMessages) {
 
 		List<InitiativeDto> subinitiativesTree = getSubinitiativesTree(initiativeId, null);
 		
@@ -863,7 +864,13 @@ public class InitiativeService {
 		allInitiativesIds.add(initiativeId);
 		allInitiativesIds.addAll(extractAllIdsFromInitiativesTree(subinitiativesTree, new ArrayList<UUID>()));
 		
-		Page<Activity> activities = activityRepository.findOfInitiatives(allInitiativesIds, page);
+		Page<Activity> activities = null;
+		
+		if(!onlyMessages) {
+			activities = activityRepository.findOfInitiatives(allInitiativesIds, page);
+		} else {
+			activities = activityRepository.findOfInitiativesAndType(allInitiativesIds, ActivityType.MESSAGE_POSTED, page);
+		}
 		
 		List<ActivityDto> activityDtos = new ArrayList<ActivityDto>();
 		
