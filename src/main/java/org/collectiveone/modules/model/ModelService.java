@@ -570,7 +570,21 @@ public class ModelService {
 		
 		cardWrapper = modelCardWrapperRepository.save(cardWrapper);
 		
-		section.getCardsWrappers().add(cardWrapper);
+		/* add location */
+		if (cardDto.getIxInSection() == null) {
+			/* at the end */
+			section.getCardsWrappers().add(cardWrapper);
+		} else {
+			if (cardDto.getIxInSection() == -1) {
+				/* at the end */
+				section.getCardsWrappers().add(cardWrapper);
+			} else {
+				/* at a given ix */
+				section.getCardsWrappers().add(cardDto.getIxInSection(), cardWrapper);
+			}
+
+		}
+		
 		modelSectionRepository.save(section);
 		
 		activityService.modelCardWrapperCreated(cardWrapper, section, appUserRepository.findByC1Id(creatorId));
@@ -612,6 +626,15 @@ public class ModelService {
 		cardWrapper.setCard(card);
 		cardWrapper.setOtherProperties(cardDto);
 		
+		/* this inSections actually refer to add to new sections */
+		for (ModelSectionDto sectionDto : cardDto.getInSections()) {
+			ModelSection section = modelSectionRepository.findById(UUID.fromString(sectionDto.getId()));
+			
+			if (section != null) {
+				section.getCardsWrappers().add(cardWrapper);
+			}
+		}
+	
 		activityService.modelCardWrapperEdited(cardWrapper, appUserRepository.findByC1Id(creatorId));
 		
 		return new PostResult("success", "card edited", cardWrapper.getId().toString());
