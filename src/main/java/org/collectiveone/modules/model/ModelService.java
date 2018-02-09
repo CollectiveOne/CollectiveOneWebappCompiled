@@ -508,9 +508,6 @@ public class ModelService {
 			}
 		} else {
 			sectionDto.setSubElementsLoaded(false);
-			for (ModelSection subsection : section.getSubsections()) {
-				sectionDto.getSubsections().add(subsection.toDto());
-			}
 		}
 		
 		return sectionDto; 
@@ -783,7 +780,13 @@ public class ModelService {
 	}
 	
 	@Transactional
-	public GetResult<Page<ActivityDto>> getActivityUnderView (UUID viewId, PageRequest page, Boolean onlyMessages) {
+	public GetResult<Long> countActivityUnderView (UUID viewId, Boolean onlyMessages) {
+		Page<Activity> activities = getActivityUnderView(viewId, new PageRequest(1, 1), onlyMessages);
+		return new GetResult<Long>("success", "activity counted", activities.getTotalElements());
+	}
+	
+	@Transactional
+	public Page<Activity> getActivityUnderView (UUID viewId, PageRequest page, Boolean onlyMessages) {
 		List<UUID> sectionIds = getAllSectionsIdsOfView(viewId);
 		List<UUID> cardsIds = sectionIds.size() > 0 ? modelCardRepository.findAllCardsIdsOfSections(sectionIds) : new ArrayList<UUID>();
 		
@@ -808,6 +811,14 @@ public class ModelService {
 			}
 		}
 		
+		return activities;
+	}
+	
+	@Transactional
+	public GetResult<Page<ActivityDto>> getActivityResultUnderView (UUID viewId, PageRequest page, Boolean onlyMessages) {
+		
+		Page<Activity> activities = getActivityUnderView(viewId, page, onlyMessages);
+		
 		List<ActivityDto> activityDtos = new ArrayList<ActivityDto>();
 		
 		for(Activity activity : activities.getContent()) {
@@ -821,7 +832,29 @@ public class ModelService {
 	}
 	
 	@Transactional
-	public GetResult<Page<ActivityDto>> getActivityUnderSection (UUID sectionId, PageRequest page, Boolean onlyMessages) {
+	public GetResult<Long> countActivityUnderSection (UUID sectionId, Boolean onlyMessages) {
+		Page<Activity> activities = getActivityUnderSection(sectionId, new PageRequest(1, 1), onlyMessages);
+		return new GetResult<Long>("success", "activity counted", activities.getTotalElements());
+	}
+	
+	@Transactional
+	public GetResult<Page<ActivityDto>> getActivityResultUnderSection (UUID sectionId, PageRequest page, Boolean onlyMessages) {
+		
+		Page<Activity> activities = getActivityUnderSection(sectionId, page, onlyMessages);
+		
+		List<ActivityDto> activityDtos = new ArrayList<ActivityDto>();
+		
+		for(Activity activity : activities.getContent()) {
+			activityDtos.add(activity.toDto());
+		}
+		
+		Page<ActivityDto> dtosPage = new PageImpl<ActivityDto>(activityDtos, page, activities.getNumberOfElements());
+		
+		return new GetResult<Page<ActivityDto>>("succes", "actvity returned", dtosPage);
+	}
+	
+	@Transactional
+	public Page<Activity> getActivityUnderSection (UUID sectionId, PageRequest page, Boolean onlyMessages) {
 		
 		List<UUID> allSectionIds = new ArrayList<UUID>();
 		
@@ -846,27 +879,30 @@ public class ModelService {
 			}
 		}
 			
-		List<ActivityDto> activityDtos = new ArrayList<ActivityDto>();
-		
-		for(Activity activity : activities.getContent()) {
-			activityDtos.add(activity.toDto());
-		}
-		
-		Page<ActivityDto> dtosPage = new PageImpl<ActivityDto>(activityDtos, page, activities.getNumberOfElements());
-		
-		return new GetResult<Page<ActivityDto>>("succes", "actvity returned", dtosPage);
-		
+		return activities;
 	}
 	
 	@Transactional
-	public GetResult<Page<ActivityDto>> getActivityUnderCard (UUID cardWrapperId, PageRequest page, Boolean onlyMessages) {
-		
+	public GetResult<Long> countActivityUnderCard (UUID cardWrapperId, Boolean onlyMessages) {
+		Page<Activity> activities = getActivityUnderCard(cardWrapperId, new PageRequest(1, 1), onlyMessages);
+		return new GetResult<Long>("success", "activity counted", activities.getTotalElements());
+	}
+	
+	@Transactional
+	public Page<Activity> getActivityUnderCard (UUID cardWrapperId, PageRequest page, Boolean onlyMessages) {
 		Page<Activity> activities = null;
 		if (!onlyMessages) {
 			activities = activityRepository.findOfCard(cardWrapperId, page);
 		} else {
 			activities = activityRepository.findOfCardAndType(cardWrapperId, ActivityType.MESSAGE_POSTED, page);
 		}
+		return activities;
+	}
+	
+	@Transactional
+	public GetResult<Page<ActivityDto>> getActivityResultUnderCard (UUID cardWrapperId, PageRequest page, Boolean onlyMessages) {
+		
+		Page<Activity> activities = getActivityUnderCard(cardWrapperId, page, onlyMessages);
 	
 		List<ActivityDto> activityDtos = new ArrayList<ActivityDto>();
 		
