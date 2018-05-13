@@ -2,3 +2,4 @@
 /bin/
 /rebel.xml
 /.classpath
+*.factorypath
