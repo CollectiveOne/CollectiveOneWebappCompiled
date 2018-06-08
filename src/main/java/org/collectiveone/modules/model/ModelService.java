@@ -274,24 +274,46 @@ public class ModelService {
 
 	    /* update neighbor cards links */
 		ModelCardWrapperAddition cardLeft = cardWrapperAddition.getAfterCardWrapperAddition();
-		ModelCardWrapperAddition cardRight = cardWrapperAddition.getBeforeCardWrapperAddition();
+		ModelCardWrapperAddition cardRight = null;
+		
+		if (cardWrapperAddition.getBeforeCardWrapperAddition() != null) {
+			if (cardWrapperAddition.getBeforeCardWrapperAddition().getScope() == ModelCardWrapperScope.COMMON) {
+				if (cardLeft != null) {
+					if (cardLeft.getScope() == ModelCardWrapperScope.COMMON) {
+						cardRight = cardWrapperAddition.getBeforeCardWrapperAddition(); 
+					} else {
+						/* actually this should never happen, but this would make sure a NON-COMMON card is not marked as 
+						 * being before a common card. */
+						cardRight = null;
+					}					
+				} else {
+					/* card left is null means this is the first card */
+					cardRight = cardWrapperAddition.getBeforeCardWrapperAddition(); 
+				}
+			} else {
+				cardRight = cardWrapperAddition.getBeforeCardWrapperAddition(); 
+			}
+		} else {
+			cardRight = null;
+		}
 		
 		if (cardLeft != null) {
-			/* common cards are linked only to other common cards */
-			if (((cardLeft.getScope() == ModelCardWrapperScope.COMMON) && (cardWrapperAddition.getScope() == ModelCardWrapperScope.COMMON)) ||
-				(cardLeft.getScope() != ModelCardWrapperScope.COMMON) && (cardWrapperAddition.getScope() != ModelCardWrapperScope.COMMON)) {
-			
+			if (cardLeft.getScope() == ModelCardWrapperScope.COMMON) {
+				if (cardWrapperAddition.getScope() == ModelCardWrapperScope.COMMON) {
+					cardLeft.setBeforeCardWrapperAddition(cardRight);
+					modelCardWrapperAdditionRepository.save(cardLeft);
+				} else {
+					/* if card left is common and this card is non-common, dont mark the card left as being 
+					 * before this. */
+				}
+			} else {
 				cardLeft.setBeforeCardWrapperAddition(cardRight);
 				modelCardWrapperAdditionRepository.save(cardLeft);
-			}
+			}	
 		}
 		if (cardRight != null) {
-			if (((cardRight.getScope() == ModelCardWrapperScope.COMMON) && (cardWrapperAddition.getScope() == ModelCardWrapperScope.COMMON)) ||
-					(cardRight.getScope() != ModelCardWrapperScope.COMMON) && (cardWrapperAddition.getScope() != ModelCardWrapperScope.COMMON)) {
-				
-				cardRight.setAfterCardWrapperAddition(cardLeft);
-				modelCardWrapperAdditionRepository.save(cardRight);
-			}
+			cardRight.setAfterCardWrapperAddition(cardLeft);
+			modelCardWrapperAdditionRepository.save(cardRight);
 		}
 		
 		return "success";
@@ -337,24 +359,63 @@ public class ModelService {
 			/* protection logic to prevent wrong orders */
 			switch (cardWrapperAddition.getScope()) {
 				case COMMON:
-					if (onCardWrapperAddition.getScope() != ModelCardWrapperScope.COMMON) {
-						return "error, cannot place a common card after a non-common card";
+					switch (onCardWrapperAddition.getScope()) {
+						case COMMON:
+							if (isBefore) {
+								cardLeft = onCardWrapperAddition.getAfterCardWrapperAddition();
+								cardRight = onCardWrapperAddition;
+							} else {
+								cardLeft = onCardWrapperAddition;
+								cardRight = onCardWrapperAddition.getBeforeCardWrapperAddition();
+							}
+							break;
+							
+						case PRIVATE:
+						case SHARED:
+							/* a common card can only be marked as being “before”, or “after” another common card */
+							return "error, cannot place a common card after a non-common card";
 					}
 					break;
 					
 				case PRIVATE:
-				case SHARED:				
+				case SHARED:
+					switch (onCardWrapperAddition.getScope()) {
+						case COMMON:
+							if (isBefore) {
+								/* a non-common card can only be marked as being “after” a common card */
+								return "error, cannot place a common card after a non-common card";
+							} else {
+								if (onCardWrapperAddition.getBeforeCardWrapperAddition() != null) {
+									switch (onCardWrapperAddition.getBeforeCardWrapperAddition().getScope()) {
+										case COMMON:
+											break;
+											
+										case PRIVATE:
+										case SHARED:
+											/* a non-common card can only be marked as “before” another non-common card */
+											cardRight = onCardWrapperAddition.getBeforeCardWrapperAddition();
+											break;
+									}
+								}
+								cardLeft = onCardWrapperAddition;
+								
+							}
+							break;
+							
+						case PRIVATE:
+						case SHARED:
+							if (isBefore) {
+								cardRight = onCardWrapperAddition;
+								cardLeft = onCardWrapperAddition.getAfterCardWrapperAddition();
+							} else {
+								cardLeft = onCardWrapperAddition;
+								cardRight = onCardWrapperAddition.getBeforeCardWrapperAddition();
+							}
+							break;
+					}
 					break;
 			}
-			
-			if (isBefore) {
-				cardLeft = onCardWrapperAddition.getAfterCardWrapperAddition();
-				cardRight = onCardWrapperAddition;
-			} else {
-				cardLeft = onCardWrapperAddition;
-				cardRight = onCardWrapperAddition.getBeforeCardWrapperAddition();
-			}
-			
+	
 		} else {
 			
 			/* if no place is specified */
@@ -387,30 +448,29 @@ public class ModelService {
 				}
 			}
 		}
-
 		
 		/* all cards can be after a common or shared or public card */
 		cardWrapperAddition.setAfterCardWrapperAddition(cardLeft);
+		cardWrapperAddition.setBeforeCardWrapperAddition(cardRight);
 		
 		if (cardLeft != null) {
-			/* common cards are linked only to other common cards */
-			if (((cardLeft.getScope() == ModelCardWrapperScope.COMMON) && (cardWrapperAddition.getScope() == ModelCardWrapperScope.COMMON)) ||
-				(cardLeft.getScope() != ModelCardWrapperScope.COMMON) && (cardWrapperAddition.getScope() != ModelCardWrapperScope.COMMON)) {
-				
+			if (cardLeft.getScope() == ModelCardWrapperScope.COMMON) {
+				if (cardWrapperAddition.getScope() == ModelCardWrapperScope.COMMON) {
+					cardLeft.setBeforeCardWrapperAddition(cardWrapperAddition);
+					modelCardWrapperAdditionRepository.save(cardLeft);
+				} else {
+					/* if card left is common and this card is non-common, dont mark the card left as being 
+					 * before this. */
+				}
+			} else {
 				cardLeft.setBeforeCardWrapperAddition(cardWrapperAddition);
-				modelCardWrapperAdditionRepository.save(cardLeft);	
-			}
+				modelCardWrapperAdditionRepository.save(cardLeft);
+			}	
 		}
 		
 		if (cardRight != null) {
-			if (((cardRight.getScope() == ModelCardWrapperScope.COMMON) && (cardWrapperAddition.getScope() == ModelCardWrapperScope.COMMON)) ||
-					(cardRight.getScope() != ModelCardWrapperScope.COMMON) && (cardWrapperAddition.getScope() != ModelCardWrapperScope.COMMON)) {
-				
-				/* but only common cards are marked as being before a common card */
-				cardWrapperAddition.setBeforeCardWrapperAddition(cardRight);
-				cardRight.setAfterCardWrapperAddition(cardWrapperAddition);
-				modelCardWrapperAdditionRepository.save(cardRight);
-			}
+			cardRight.setAfterCardWrapperAddition(cardWrapperAddition);
+			modelCardWrapperAdditionRepository.save(cardRight);
 		}
 		
 		modelCardWrapperAdditionRepository.save(cardWrapperAddition);
