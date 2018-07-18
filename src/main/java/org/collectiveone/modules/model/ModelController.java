@@ -1,5 +1,6 @@
 package org.collectiveone.modules.model;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.collectiveone.common.BaseController;
@@ -11,10 +12,13 @@ import org.collectiveone.modules.governance.GovernanceService;
 import org.collectiveone.modules.initiatives.Initiative;
 import org.collectiveone.modules.initiatives.InitiativeService;
 import org.collectiveone.modules.model.dto.CardWrappersHolderDto;
+import org.collectiveone.modules.model.dto.ElementConsentPositionDto;
 import org.collectiveone.modules.model.dto.ModelCardDto;
 import org.collectiveone.modules.model.dto.ModelCardWrapperDto;
 import org.collectiveone.modules.model.dto.ModelSectionDto;
 import org.collectiveone.modules.model.dto.ModelSectionLinkedDto;
+import org.collectiveone.modules.model.enums.ElementConsentPositionColor;
+import org.collectiveone.modules.model.enums.SimpleConsentState;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -135,7 +139,7 @@ public class ModelController extends BaseController {
 		
 		UUID parentSectionId = parentSectionIdStr.equals("") ? null : UUID.fromString(parentSectionIdStr);
 		
-		return modelService.editSection(sectionId, parentSectionId, sectionDto, getLoggedUser().getC1Id());
+		return modelService.editSection(sectionId, parentSectionId, sectionDto, getLoggedUserId());
 	}
 	
 	@RequestMapping(path = "/model/section/{sectionId}/removeSubsection/{subsectionId}", method = RequestMethod.PUT) 
@@ -615,5 +619,76 @@ public class ModelController extends BaseController {
 		}
 		
 		return modelService.countCardLikes(cardWrapperId);
+	}
+	
+	@RequestMapping(path = "/model/cardAddition/{elementId}/setConsent", method = RequestMethod.PUT)
+	public PostResult setConsentStatus(
+			@PathVariable("elementId") String elementIdStr,
+			@RequestParam("elementType") String elementType,
+			@RequestParam("simpleConsentState") SimpleConsentState consentState) {
+		
+		if (getLoggedUser() == null) {
+			return new PostResult("error", "endpoint enabled users only", null);
+		}
+		
+		UUID elementId = UUID.fromString(elementIdStr);
+		Initiative initiative = null;
+		
+		switch (elementType) {
+			case "CARD_WRAPPER_ADDITION":
+				initiative = modelService.getCardWrapperAdditionInitiative(elementId);
+		}
+				
+		if (!initiativeService.isMemberOfEcosystem(initiative.getId(), getLoggedUserId())) {
+			return new PostResult("error", "not authorized", "");
+		}
+				
+		return modelService.setSimpleConsentState(elementId, consentState, getLoggedUserId());
+	}
+	
+	
+	@RequestMapping(path = "/model/cardAddition/{elementId}/consentPosition", method = RequestMethod.PUT)
+	public PostResult setUserPosition(
+			@PathVariable("elementId") String elementIdStr,
+			@RequestParam("consentPosition") ElementConsentPositionColor consentPositionColor,
+			@RequestParam("elementType") String elementType) {
+		
+		if (getLoggedUser() == null) {
+			return new PostResult("error", "endpoint enabled users only", null);
+		}
+		
+		UUID elementId = UUID.fromString(elementIdStr);
+		Initiative initiative = null;
+		
+		switch (elementType) {
+			case "CARD_WRAPPER_ADDITION":
+				initiative = modelService.getCardWrapperAdditionInitiative(elementId);
+		}
+				
+		if (!initiativeService.isMemberOfEcosystem(initiative.getId(), getLoggedUserId())) {
+			return new PostResult("error", "not authorized", "");
+		}
+				
+		return modelService.setSimpleConsentUserPosition(elementId, getLoggedUserId(), consentPositionColor);
+	}
+	
+	@RequestMapping(path = "/model/cardAddition/{elementId}/consentPositions", method = RequestMethod.GET)
+	public GetResult<List<ElementConsentPositionDto>> getPositionsOnCard(
+			@PathVariable("elementId") String elementIdStr,
+			@RequestParam("elementType") String elementType) {
+		
+		UUID elementId = UUID.fromString(elementIdStr);
+		Initiative initiative = null;
+		
+		switch (elementType) {
+			case "CARD_WRAPPER_ADDITION":
+				initiative = modelService.getCardWrapperAdditionInitiative(elementId);
+		}
+				
+		if (!initiativeService.isMemberOfEcosystem(initiative.getId(), getLoggedUserId())) {
+			return new GetResult<List<ElementConsentPositionDto>>("error", "not authorized", null);
+		}
+				
+		return modelService.getConsentPositions(elementId);
 	}
 }

@@ -4,11 +4,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.collectiveone.modules.model.ModelScope;
+import org.collectiveone.modules.model.enums.ElementConsentPositionColor;
+import org.collectiveone.modules.model.enums.ElementGovernanceType;
+import org.collectiveone.modules.model.enums.SimpleConsentState;
 import org.collectiveone.modules.users.AppUserDto;
 
 public class ModelCardWrapperDto {
 
 	private String id;
+	private String additionId;
 	private ModelCardDto card;
 	private AppUserDto creator;
 	private Long creationDate; 
@@ -25,12 +29,25 @@ public class ModelCardWrapperDto {
 	private String beforeElementId;
 	private String afterElementId;
 	
+	/* for governance */
+	private ElementGovernanceType newGovernanceType;
+	private ElementGovernanceType governanceType;
+	private SimpleConsentState simpleConsentState;	
+	
+	private ElementConsentPositionColor ownPosition;
+	
 	
 	public String getId() {
 		return id;
 	}
 	public void setId(String id) {
 		this.id = id;
+	}
+	public String getAdditionId() {
+		return additionId;
+	}
+	public void setAdditionId(String additionId) {
+		this.additionId = additionId;
 	}
 	public ModelCardDto getCard() {
 		return card;
@@ -109,6 +126,30 @@ public class ModelCardWrapperDto {
 	}
 	public void setAfterElementId(String afterElementId) {
 		this.afterElementId = afterElementId;
+	}
+	public ElementGovernanceType getNewGovernanceType() {
+		return newGovernanceType;
+	}
+	public void setNewGovernanceType(ElementGovernanceType newGovernanceType) {
+		this.newGovernanceType = newGovernanceType;
+	}
+	public ElementGovernanceType getGovernanceType() {
+		return governanceType;
+	}
+	public void setGovernanceType(ElementGovernanceType governanceType) {
+		this.governanceType = governanceType;
+	}
+	public SimpleConsentState getSimpleConsentState() {
+		return simpleConsentState;
+	}
+	public void setSimpleConsentState(SimpleConsentState simpleConsentState) {
+		this.simpleConsentState = simpleConsentState;
+	}
+	public ElementConsentPositionColor getOwnPosition() {
+		return ownPosition;
+	}
+	public void setOwnPosition(ElementConsentPositionColor ownPosition) {
+		this.ownPosition = ownPosition;
 	}
 	
 }

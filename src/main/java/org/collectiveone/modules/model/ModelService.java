@@ -23,11 +23,17 @@ import org.collectiveone.modules.initiatives.Initiative;
 import org.collectiveone.modules.initiatives.InitiativeService;
 import org.collectiveone.modules.initiatives.repositories.InitiativeRepositoryIf;
 import org.collectiveone.modules.model.dto.CardWrappersHolderDto;
+import org.collectiveone.modules.model.dto.ElementConsentPositionDto;
 import org.collectiveone.modules.model.dto.ModelCardDto;
 import org.collectiveone.modules.model.dto.ModelCardWrapperDto;
 import org.collectiveone.modules.model.dto.ModelSectionDto;
 import org.collectiveone.modules.model.dto.ModelSectionLinkedDto;
 import org.collectiveone.modules.model.dto.SubsectionsHolderDto;
+import org.collectiveone.modules.model.enums.ElementConsentPositionColor;
+import org.collectiveone.modules.model.enums.ElementGovernanceType;
+import org.collectiveone.modules.model.enums.SimpleConsentState;
+import org.collectiveone.modules.model.enums.Status;
+import org.collectiveone.modules.model.repositories.ConsentPositionRepositoryIf;
 import org.collectiveone.modules.model.repositories.ModelCardRepositoryIf;
 import org.collectiveone.modules.model.repositories.ModelCardWrapperAdditionRepositoryIf;
 import org.collectiveone.modules.model.repositories.ModelCardWrapperRepositoryIf;
@@ -84,6 +90,9 @@ public class ModelService {
 	@Autowired
 	private ModelSubsectionRepositoryIf modelSubsectionRepository;
 	
+	@Autowired
+	private ConsentPositionRepositoryIf consentPositionRepository;
+	
 	
 	@Transactional
 	public GetResult<ModelSectionDto> getModel(UUID initiativeId, Integer level, UUID requestById, Boolean onlySections) {
@@ -112,6 +121,7 @@ public class ModelService {
 			Boolean isBefore) {
 		
 		ModelSection section = sectionDto.toEntity(null, sectionDto);
+		
 		section = modelSectionRepository.save(section);
 		
 		ModelSection parent = modelSectionRepository.findById(parentSectionId);
@@ -223,6 +233,7 @@ public class ModelService {
 		ModelSection section = modelSectionRepository.findById(sectionId);
 		
 		section = sectionDto.toEntity(section, sectionDto);
+		
 		section = modelSectionRepository.save(section);
 		
 		ModelSubsection subsection = null;
@@ -877,7 +888,12 @@ public class ModelService {
 		
 		/* Card wrapper additions are converted into card wrappers dtos for simplicity */
 		ModelCardWrapperDto cardWrapperDto = cardWrapperAddition.getCardWrapper().toDto();
+		
+		/* data associated to the addition */
+		cardWrapperDto.setAdditionId(cardWrapperAddition.getId().toString());
 		cardWrapperDto.setScope(cardWrapperAddition.getScope());
+		cardWrapperDto.setGovernanceType(cardWrapperAddition.getGovernanceType());
+		cardWrapperDto.setSimpleConsentState(cardWrapperAddition.getSimpleConsentState());
 		
 		/* check if this card wrapper is private on that section only adder is able to see it */
 		if (cardWrapperAddition.getScope() == ModelScope.PRIVATE) {
@@ -923,6 +939,15 @@ public class ModelService {
 				cardWrapperDto.getInModelSections().add(thisAddition.toInModelSectionDto());	
 			}
 		}
+		
+		/* section governance */
+		if (cardWrapperAddition.getGovernanceType() == ElementGovernanceType.SIMPLE_CONSENT) {
+			ElementConsentPosition consentStatus = consentPositionRepository.findByElementIdAndAuthor_c1Id(cardWrapperAddition.getId(), requestByUserId);
+			if (consentStatus != null) {
+				cardWrapperDto.setOwnPosition(consentStatus.getPositionColor());
+			} 
+		}
+		
 		
 		return cardWrapperDto;
 	}
@@ -1231,6 +1256,7 @@ public class ModelService {
 		
 		ModelCardWrapperAddition cardWrapperAddition = new ModelCardWrapperAddition();
 		cardWrapperAddition.setCardWrapper(modelCardWrapperRepository.findById(cardWrapperId));
+		cardWrapperAddition.setId(UUID.fromString("00000000-0000-0000-0000-000000000000"));
 		
 		cardWrapperDto = getCardWrapperDtoWithMetadata(cardWrapperAddition, requestByUserId);
 		
@@ -1270,6 +1296,12 @@ public class ModelService {
 	public Initiative getCardWrapperInitiative(UUID cardWrapperId) {
 		return modelCardWrapperRepository.findById(cardWrapperId).getInitiative();
 	}
+	
+	@Transactional
+	public Initiative getCardWrapperAdditionInitiative(UUID cardWrapperAdditionId) {
+		return modelCardWrapperAdditionRepository.findById(cardWrapperAdditionId).getSection().getInitiative();
+	}
+	
 	
 	@Transactional
 	public GetResult<Page<ModelCardWrapperDto>> searchCardWrapper(
@@ -1629,6 +1661,63 @@ public class ModelService {
 	@Transactional
 	public GetResult<Integer> countCardLikes (UUID cardWrapperId) {
 		return new GetResult<Integer>("success", "cards counted", cardLikeRepository.countOfCard(cardWrapperId));
+	}
+	
+	@Transactional
+	public PostResult setSimpleConsentState (UUID elementId, SimpleConsentState state, UUID requestByUserId) {
+		ModelCardWrapperAddition cardWrapperAddition = modelCardWrapperAdditionRepository.findById(elementId);
+		
+		if (cardWrapperAddition.getGovernanceType() != ElementGovernanceType.SIMPLE_CONSENT) {
+			cardWrapperAddition.setGovernanceType(ElementGovernanceType.SIMPLE_CONSENT);
+			cardWrapperAddition.setSimpleConsentState(SimpleConsentState.OPENED);
+			
+			activityService.consentStatusStarted(cardWrapperAddition, appUserRepository.findByC1Id(requestByUserId));
+		} else {
+			if (state == SimpleConsentState.CLOSED) {
+				cardWrapperAddition.setSimpleConsentState(SimpleConsentState.CLOSED);
+				activityService.consentStatusClosed(cardWrapperAddition, appUserRepository.findByC1Id(requestByUserId));
+			} else {
+				cardWrapperAddition.setSimpleConsentState(SimpleConsentState.OPENED);
+				activityService.consentStatusReopened(cardWrapperAddition, appUserRepository.findByC1Id(requestByUserId));
+			}
+		}
+		
+		modelCardWrapperAdditionRepository.save(cardWrapperAddition);
+		
+		return new PostResult("success", "card consent state changed", cardWrapperAddition.getId().toString()); 
+	}
+	
+	@Transactional
+	public PostResult setSimpleConsentUserPosition(UUID elementId, UUID authorId, ElementConsentPositionColor positionColor) {
+		ModelCardWrapperAddition cardWrapperAddition = modelCardWrapperAdditionRepository.findById(elementId);
+		ElementConsentPosition consentPosition = consentPositionRepository.findByElementIdAndAuthor_c1Id(elementId, authorId);
+		
+		if (consentPosition == null) {
+			consentPosition = new ElementConsentPosition();
+			consentPosition.setAuthor(appUserRepository.findByC1Id(authorId));
+			consentPosition.setElementId(elementId);
+			
+			activityService.consentPositionStated(cardWrapperAddition, positionColor, appUserRepository.findByC1Id(authorId));
+		} else {
+			activityService.consentPositionChanged(cardWrapperAddition, positionColor, appUserRepository.findByC1Id(authorId));
+		}
+		
+		consentPosition.setPositionColor(positionColor);
+		consentPosition = consentPositionRepository.save(consentPosition);
+		
+		return new PostResult("success", "semaphore state changed", consentPosition.getId().toString());
+	}
+	
+	@Transactional
+	public GetResult<List<ElementConsentPositionDto>> getConsentPositions(UUID elementId) {
+		List<ElementConsentPosition> semaphores = consentPositionRepository.findByElementId(elementId);
+		
+		List<ElementConsentPositionDto> semaphoresDtos = new ArrayList<ElementConsentPositionDto>();
+		
+		for (ElementConsentPosition semaphore : semaphores) {
+			semaphoresDtos.add(semaphore.toDto());
+		}
+		return new GetResult<List<ElementConsentPositionDto>>("success", "semaphores retreived", semaphoresDtos);
 	}
 	
 }
