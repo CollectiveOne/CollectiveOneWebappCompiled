@@ -56,6 +56,10 @@ public class ModelCardWrapper {
 	@ManyToMany
 	private List<AppUser> editors = new ArrayList<AppUser>();
 	
+	@ManyToMany
+	private List<ModelCardWrapperAddition> originCardWrapperAdditions = new ArrayList<ModelCardWrapperAddition>();
+	
+	
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -164,6 +168,14 @@ public class ModelCardWrapper {
 
 	public void setEditors(List<AppUser> editors) {
 		this.editors = editors;
+	}
+
+	public List<ModelCardWrapperAddition> getOriginCardWrapperAdditions() {
+		return originCardWrapperAdditions;
+	}
+
+	public void setOriginCardWrapperAdditions(List<ModelCardWrapperAddition> originCardWrapperAdditions) {
+		this.originCardWrapperAdditions = originCardWrapperAdditions;
 	}
 	
 }
