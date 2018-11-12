@@ -3,6 +3,7 @@ package org.collectiveone.modules.initiatives.repositories;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.collectiveone.modules.initiatives.Initiative;
@@ -38,8 +39,11 @@ public interface InitiativeRepositoryIf extends CrudRepository<Initiative, UUID>
 	@Query("SELECT mta.visibility FROM Initiative init JOIN init.meta mta WHERE init.id = ?1")
 	InitiativeVisibility getVisiblity(UUID initiativeId);
 	
-	@Query("SELECT init.id FROM Initiative init WHERE init.topModelSubsection.id = ?1")
+	@Query("SELECT init.id FROM Initiative init WHERE init.topModelSubsection.section.id = ?1")
 	UUID findByTopLevelSectionId(UUID sectionId);
+	
+	@Query("SELECT init.id FROM Initiative init WHERE init.topModelSubsection.section.id IN ?1")
+	List<UUID> findByTopLevelSectionIds(Set<UUID> sectionId);
 	
 	@Query("SELECT init.topModelSubsection.section.id FROM Initiative init WHERE init.id = ?1")
 	UUID findTopModelSectionIdById(UUID initiativeId);

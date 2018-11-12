@@ -161,7 +161,7 @@ public class ActivityService {
 		Date now = new Date();
 		Calendar c = Calendar.getInstance();
 		c.setTime(now);
-		c.add(Calendar.WEEK_OF_MONTH, -2);
+		c.add(Calendar.MONTH, -1);
 		
 		notificationRepository.deleteOlderThan(new Timestamp(c.getTimeInMillis()));
 	}
@@ -908,7 +908,6 @@ public class ActivityService {
 		activity.setModelCardWrapperAddition(cardWrapperAddition);
 		activity = activityRepository.save(activity);
 		
-		broadcastMessage(activity);
 		addInitiativeActivityNotifications(activity);
 	}
 	
@@ -1559,28 +1558,29 @@ public class ActivityService {
 				appendSectionSubscribers(parent.getElementId(), subscribersMap);
 			}	
 		} else {
-			/* this is a top level section associated to an initiative, get that initiative subscribers */
+			/* this is a top level subsection associated to an initiative, get that initiative subscribers */
 			UUID initiativeId = initiativeRepository.findByTopLevelSectionId(sectionId);
-			List<Subscriber> initSubscribers = subscriberRepository.findByElementId(initiativeId);
-			
-			for (Subscriber subscriber : initSubscribers) {
+			if (initiativeId != null) {
+				List<Subscriber> initSubscribers = subscriberRepository.findByElementId(initiativeId);
 				
-				if (!subscribersMap.containsKey(subscriber.getUser().getC1Id())) {
-					/* if the user has not been added, then just add him */
-					subscribersMap.put(subscriber.getUser().getC1Id(), subscriber);
+				for (Subscriber subscriber : initSubscribers) {
 					
-				} else {
-					/* else, if this subscriber is CUSTOM, get the current subscriber and replace him if INHERIT */
-					if (subscriber.getInheritConfig() == SubscriberInheritConfig.CUSTOM) {
-						Subscriber existingSubscriber = subscribersMap.get(subscriber.getUser().getC1Id());
-						if (existingSubscriber.getInheritConfig() == SubscriberInheritConfig.INHERIT) {
-							subscribersMap.put(subscriber.getUser().getC1Id(), subscriber);
+					if (!subscribersMap.containsKey(subscriber.getUser().getC1Id())) {
+						/* if the user has not been added, then just add him */
+						subscribersMap.put(subscriber.getUser().getC1Id(), subscriber);
+						
+					} else {
+						/* else, if this subscriber is CUSTOM, get the current subscriber and replace him if INHERIT */
+						if (subscriber.getInheritConfig() == SubscriberInheritConfig.CUSTOM) {
+							Subscriber existingSubscriber = subscribersMap.get(subscriber.getUser().getC1Id());
+							if (existingSubscriber.getInheritConfig() == SubscriberInheritConfig.INHERIT) {
+								subscribersMap.put(subscriber.getUser().getC1Id(), subscriber);
+							}
 						}
 					}
 				}
 			}
-		}
-		
+		}		
 	}
 	
 	@Transactional
@@ -1667,6 +1667,12 @@ public class ActivityService {
 				template.convertAndSend("/channel/activity/model/section/" + sectionId, "UPDATE");
 			}
 			
+			/* initiative is not saved in the activity of model sections anymore */
+			List<UUID> initiativesIds = initiativeRepository.findByTopLevelSectionIds(allIncumbentSectionsIds);
+			
+			for (UUID id : initiativesIds) {
+	            template.convertAndSend("/channel/activity/model/initiative/" + id, "UPDATE");
+	        }
 		}
 		
 		/* all events are broadcasted to their initaitive channel and their parents */
