@@ -296,7 +296,7 @@ self.__precacheManifest = [
     "url": "/img/burn.73cce807.svg"
   },
   {
-    "revision": "f24d372bc4c257a2452a720a03d35932",
+    "revision": "84ec8a308863ddb6a5e4d0a576cb192f",
     "url": "/index.html"
   },
   {
