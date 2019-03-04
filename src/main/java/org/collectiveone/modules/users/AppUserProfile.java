@@ -1,5 +1,6 @@
 package org.collectiveone.modules.users;
 
+import java.util.List;
 import java.util.UUID;
 
 import javax.persistence.Column;
@@ -8,6 +9,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.Lob;
 import javax.persistence.ManyToOne;
+import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
 
@@ -30,6 +32,9 @@ public class AppUserProfile {
 	
 	@OneToOne
 	private AppUser user;
+	
+	@OneToMany(mappedBy = "profile")
+	private List<PushSubscription> subscriptions;
 	
 	@Column(name = "nickname", length = 32)
 	private String nickname;
@@ -82,13 +87,21 @@ public class AppUserProfile {
 	public void setUser(AppUser user) {
 		this.user = user;
 	}
-
+	
 	public String getNickname() {
 		return nickname;
 	}
 
 	public void setNickname(String nickname) {
 		this.nickname = nickname;
+	}
+	
+	public List<PushSubscription> getSubscriptions() {
+		return subscriptions;
+	}
+
+	public void setSubscriptions(List<PushSubscription> subscriptions) {
+		this.subscriptions = subscriptions;
 	}
 
 	public String getPictureUrl() {

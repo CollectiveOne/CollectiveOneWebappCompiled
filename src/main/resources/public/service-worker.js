@@ -1,31 +1,44 @@
-/**
- * Welcome to your Workbox-powered service worker!
- *
- * You'll need to register this file in your web app and you should
- * disable HTTP caching for this file too.
- * See https://goo.gl/nhQhGp
- *
- * The rest of the code is auto-generated. Please don't update this file
- * directly; instead, make changes to your Workbox build configuration
- * and re-run your build process.
- * See https://goo.gl/2aRDsh
- */
+importScripts("/precache-manifest.7b3b0406a294daf83fce1e72c6768c2b.js", "https://storage.googleapis.com/workbox-cdn/releases/3.6.3/workbox-sw.js");
 
-importScripts("https://storage.googleapis.com/workbox-cdn/releases/3.6.3/workbox-sw.js");
+importScripts('./notifHelper.js')
 
-importScripts(
-  "/precache-manifest.4d463f1e2f4dcf0ca1da33e4e36d3c01.js"
-);
+if (workbox) {
+    console.log(`Workbox is loaded`);
+    workbox.precaching.precacheAndRoute(self.__precacheManifest);
+    workbox.skipWaiting();
+}
+else {
+    console.log(`Workbox didn't load`);
+}
 
-workbox.core.setCacheNameDetails({prefix: "c1-frontend"});
+self.addEventListener('notificationclick', function(event) {
+  console.log('[Service Worker] Notification click Received.');
+  console.log(event.notification);
 
-workbox.skipWaiting();
+  event.notification.close();
 
-/**
- * The workboxSW.precacheAndRoute() method efficiently caches and responds to
- * requests for URLs in the manifest.
- * See https://goo.gl/S9QRab
- */
-self.__precacheManifest = [].concat(self.__precacheManifest || []);
-workbox.precaching.suppressWarnings();
-workbox.precaching.precacheAndRoute(self.__precacheManifest, {});
+  event.waitUntil(
+    clients.openWindow(event.notification.data.url)
+  );
+});
+
+self.addEventListener('push', function(event) {
+  console.log('[Service Worker] Push notification received')
+  console.log(event)
+  let notification = {
+      url: 'http://www.google.com',
+      id: '65465465465465465465',
+      title: 'new event in CollectiveOne',
+      message: 'new message hellow',
+      activity: {
+        triggerUser: {
+          nickname: 'pepo dummy',
+          pictureUrl: 'https://lh4.googleusercontent.com/-GklJ1T6lIjc/AAAAAAAAAAI/AAAAAAAAACY/4F11RvbtP5E/photo.jpg'
+        }
+      }
+    }
+  event.waitUntil(
+    showNotification(self.registration, notification)
+  );
+});
+

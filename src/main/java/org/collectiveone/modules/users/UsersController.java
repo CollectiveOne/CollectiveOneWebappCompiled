@@ -76,6 +76,23 @@ public class UsersController extends BaseController {
 		
 	}
 	
+	@RequestMapping(path = "/user/{userId}/subscription",  method = RequestMethod.PUT)
+    public PostResult setPushEndpoint(@PathVariable("userId") UUID userId, 
+    		@RequestBody SubscriptionDto subscription) {
+		
+		if (getLoggedUser() == null) {
+			return new PostResult("error", "endpoint enabled users only", null);
+		}
+		
+		if (!getLoggedUserId().equals(userId)) {
+			return new PostResult("error", "only the profile owner can edit a profile", "");
+		}
+		
+		return appUserService.setSubscription(userId, subscription);
+	}
+	
+	
+	
 	@RequestMapping(path = "/users/suggestions", method = RequestMethod.GET)
 	public GetResult<List<AppUserDto>> suggestions(@RequestParam("q") String query) {
 		return appUserService.searchBy(query);
