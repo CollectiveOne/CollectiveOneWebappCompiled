@@ -1,4 +1,4 @@
-importScripts("/precache-manifest.7b3b0406a294daf83fce1e72c6768c2b.js", "https://storage.googleapis.com/workbox-cdn/releases/3.6.3/workbox-sw.js");
+importScripts("/precache-manifest.4264dd83c7e14ec309d44f29b1b2b329.js", "https://storage.googleapis.com/workbox-cdn/releases/3.6.3/workbox-sw.js");
 
 importScripts('./notifHelper.js')
 
